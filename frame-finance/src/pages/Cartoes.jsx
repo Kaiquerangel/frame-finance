@@ -302,8 +302,8 @@ export default function Cartoes({ userId }) {
             </Card>
           </div>
         )}
-  
-      {/* Edit Card Modal */}
+
+        {/* Edit Card Modal */}
       {editId && (
         <div onClick={e => e.target === e.currentTarget && setEditId(null)} style={{
           position: "fixed", inset: 0, zIndex: 200,
@@ -351,7 +351,6 @@ export default function Cartoes({ userId }) {
           </div>
         </div>
       )}
-    </div>
     </div>
   );
 }
