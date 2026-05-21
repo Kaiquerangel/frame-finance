@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@supabase/supabase-js": "^2.106.1"
+    "@supabase/supabase-js": "^2.106.1",
+    "recharts": "^2.10.4"
   }
 }
