@@ -25,6 +25,8 @@ export default function Cartoes({ userId }) {
   const [selected, setSelected]     = useState(null);
   const [filterMonth, setFilterMonth] = useState(today());
   const [loading, setLoading]       = useState(false);
+  const [editId, setEditId]         = useState(null);
+  const [editForm, setEditForm]     = useState({});
   const [form, setForm] = useState({ name: "", limit_amount: "", closing_day: "", due_day: "", color: "#7c3aed" });
 
   const load = async () => {
