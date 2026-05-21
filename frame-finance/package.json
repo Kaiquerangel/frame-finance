@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
-    "recharts": "^2.10.4"
+    "@vitejs/plugin-react": "^6.0.2",
+    "recharts": "^2.10.4",
+    "vite": "^8.0.13"
   }
 }
