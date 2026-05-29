@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -20,6 +21,7 @@ const inp = {
 const TABS = ["Extrato Unificado", "Faturas", "Metas Concluídas", "Resumo Anual"];
 
 export default function Historico({ userId }) {
+  const isMobile = useIsMobile();
   const [tab, setTab]                   = useState("Extrato Unificado");
   const [transactions, setTransactions] = useState([]);
   const [revenues, setRevenues]         = useState([]);

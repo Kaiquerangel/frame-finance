@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 import { loadCategories } from "../lib/categories";
 
@@ -80,6 +81,7 @@ function bestDayToBuy(card) {
 }
 
 export default function Compras({ userId }) {
+  const isMobile = useIsMobile();
   const [purchases, setPurchases]       = useState([]);
   const [installments, setInstallments] = useState([]);
   const [cards, setCards]               = useState([]);

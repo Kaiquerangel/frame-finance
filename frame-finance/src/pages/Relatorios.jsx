@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
@@ -30,6 +31,7 @@ const Delta = ({ value, invert = false }) => {
 const TABS = ["Geral","Comparativo","Juros","Dívidas","Extrato"];
 
 export default function Relatorios({ userId }) {
+  const isMobile = useIsMobile();
   const [transactions, setTransactions] = useState([]);
   const [revenues, setRevenues]         = useState([]);
   const [installments, setInstallments] = useState([]);

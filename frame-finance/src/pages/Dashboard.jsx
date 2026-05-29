@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { generateAlerts } from "../lib/alerts";
+import { useIsMobile } from "../lib/useIsMobile";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -24,7 +25,6 @@ const ALERT_COLORS = {
   success: { bg: "var(--greenbg)", color: "var(--green)",  icon: "✓" },
 };
 
-// ── Health Score Ring ────────────────────────────────────────────────────────
 function HealthScore({ score }) {
   const color = score >= 75 ? "var(--green)" : score >= 50 ? "#f59e0b" : "var(--red)";
   const label = score >= 75 ? "Boa" : score >= 50 ? "Regular" : "Atenção";
@@ -48,7 +48,6 @@ function HealthScore({ score }) {
   );
 }
 
-// ── Card Gauge ───────────────────────────────────────────────────────────────
 function CardGauge({ card, used }) {
   const pct = card.limit_amount > 0 ? Math.min((used / card.limit_amount) * 100, 100) : 0;
   const color = pct > 80 ? "var(--red)" : pct > 60 ? "#f59e0b" : "var(--green)";
@@ -74,7 +73,6 @@ function CardGauge({ card, used }) {
   );
 }
 
-// ── Goal Ring ────────────────────────────────────────────────────────────────
 function GoalRing({ goal }) {
   const pct = Math.min((Number(goal.saved) / Number(goal.target)) * 100, 100);
   const done = pct >= 100;
@@ -96,7 +94,6 @@ function GoalRing({ goal }) {
   );
 }
 
-// ── Spending Heatmap ─────────────────────────────────────────────────────────
 function SpendingHeatmap({ transactions, filterMonth }) {
   const [y, m] = filterMonth.split("-");
   const daysInMonth = new Date(+y, +m, 0).getDate();
@@ -114,7 +111,6 @@ function SpendingHeatmap({ transactions, filterMonth }) {
 
   const maxSpend = Math.max(...Object.values(spendByDay), 1);
   const days = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-
   const cells = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -139,7 +135,6 @@ function SpendingHeatmap({ transactions, filterMonth }) {
             aspectRatio: "1", borderRadius: 4,
             background: day ? getColor(day) : "transparent",
             cursor: day && spendByDay[day] ? "pointer" : "default",
-            transition: "opacity .15s",
             position: "relative",
           }}>
             {day && <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: 8, color: spendByDay[day] ? "#fff" : "var(--muted)", fontWeight: 600 }}>{day}</span>}
@@ -155,7 +150,6 @@ function SpendingHeatmap({ transactions, filterMonth }) {
   );
 }
 
-// ── Custom Treemap ────────────────────────────────────────────────────────────
 const CustomTreemapContent = ({ x, y, width, height, name, value, index }) => {
   if (width < 30 || height < 20) return null;
   return (
@@ -173,8 +167,8 @@ const CustomTreemapContent = ({ x, y, width, height, name, value, index }) => {
   );
 };
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard({ userId }) {
+  const isMobile = useIsMobile();
   const [transactions, setTransactions]   = useState([]);
   const [revenues, setRevenues]           = useState([]);
   const [installments, setInstallments]   = useState([]);
@@ -229,7 +223,6 @@ export default function Dashboard({ userId }) {
     return { rec, dep, bal: rec - dep };
   }, [filteredTx, filteredRev]);
 
-  // Health score
   const healthScore = useMemo(() => {
     let score = 100;
     const totalRec = filteredRev.reduce((a, r) => a + Number(r.amount), 0);
@@ -250,7 +243,6 @@ export default function Dashboard({ userId }) {
     return Math.max(0, Math.min(100, Math.round(score)));
   }, [filteredTx, filteredRev, installments, loanInst, budgets, goals]);
 
-  // Monthly chart
   const monthlyData = useMemo(() => {
     const last6 = [...new Set([...transactions.map(t => t.date.slice(0,7)), ...revenues.map(r => r.date.slice(0,7))])].sort().slice(-6);
     return last6.map(ym => {
@@ -261,20 +253,17 @@ export default function Dashboard({ userId }) {
     });
   }, [transactions, revenues]);
 
-  // Accumulated balance
   const accumulatedBalance = useMemo(() => {
     let cum = 0;
     return monthlyData.map(d => { cum += d.Saldo; return { name: d.name, Patrimônio: cum }; });
   }, [monthlyData]);
 
-  // Treemap data
   const treemapData = useMemo(() => {
     const map = {};
     filteredTx.filter(t => t.type === "despesa").forEach(t => { map[t.cat] = (map[t.cat]||0) + Number(t.value); });
     return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
   }, [filteredTx]);
 
-  // Debt evolution
   const debtEvolution = useMemo(() => {
     const allInst = [...installments, ...loanInst];
     const ms = [...new Set(allInst.map(i => (i.due_date||"").slice(0,7)))].sort().slice(-6);
@@ -285,7 +274,6 @@ export default function Dashboard({ userId }) {
     }));
   }, [installments, loanInst]);
 
-  // Card usage
   const cardUsage = useMemo(() => {
     return cards.map(card => {
       const used = installments.filter(i => i.purchases?.card_id === card.id && !i.paid).reduce((a,i) => a + Number(i.amount), 0);
@@ -293,7 +281,6 @@ export default function Dashboard({ userId }) {
     });
   }, [cards, installments]);
 
-  // Budget progress
   const spentByCat = useMemo(() => {
     const map = {};
     filteredTx.filter(t => t.type === "despesa").forEach(t => { map[t.cat] = (map[t.cat]||0) + Number(t.value); });
@@ -304,17 +291,27 @@ export default function Dashboard({ userId }) {
   const planned = budgets.reduce((a, b) => a + Number(b.amount), 0);
   const empty = (msg="Sem dados ainda") => <div style={{ color:"var(--muted)", textAlign:"center", padding:"32px 0", fontSize:13 }}>{msg}</div>;
 
+  // Responsive helpers
+  const col2 = isMobile ? "1fr" : "1fr 1fr";
+  const col2bar = isMobile ? "1fr" : "1.4fr 1fr";
+  const col4kpi = isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1.2fr";
+  const gap = isMobile ? 10 : 12;
+
   return (
     <div>
       {/* Header */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
-        <div>
-          <h1 style={{ fontWeight:800, fontSize:22, color:"var(--text)", letterSpacing:"-.02em" }}>Dashboard</h1>
-          <p style={{ color:"var(--muted)", fontSize:13, marginTop:2 }}>Visão geral das suas finanças</p>
-        </div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: isMobile ? 16 : 24 }}>
+        {!isMobile && (
+          <div>
+            <h1 style={{ fontWeight:800, fontSize:22, color:"var(--text)", letterSpacing:"-.02em" }}>Dashboard</h1>
+            <p style={{ color:"var(--muted)", fontSize:13, marginTop:2 }}>Visão geral das suas finanças</p>
+          </div>
+        )}
         <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{
           padding:"7px 12px", borderRadius:8, border:"1px solid var(--border)",
           background:"var(--surface)", color:"var(--text)", fontSize:13, outline:"none", cursor:"pointer",
+          marginLeft: isMobile ? 0 : "auto",
+          width: isMobile ? "100%" : "auto",
         }}>
           {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
         </select>
@@ -336,7 +333,7 @@ export default function Dashboard({ userId }) {
       )}
 
       {/* Row 1: KPIs + Health */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1.2fr", gap:12, marginBottom:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns: col4kpi, gap, marginBottom: gap }}>
         {[
           { label:"Receitas", value:totals.rec, color:"var(--green)" },
           { label:"Despesas", value:totals.dep, color:"var(--red)" },
@@ -344,24 +341,27 @@ export default function Dashboard({ userId }) {
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <div style={{ fontSize:11, fontWeight:600, color:"var(--muted)", textTransform:"uppercase", letterSpacing:".06em", marginBottom:8 }}>{label}</div>
-            <div style={{ fontSize:22, fontWeight:800, color, letterSpacing:"-.02em" }}>{fmt(value)}</div>
+            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight:800, color, letterSpacing:"-.02em" }}>{fmt(value)}</div>
           </Card>
         ))}
-        <Card><HealthScore score={healthScore} /></Card>
+        {/* Health Score ocupa linha inteira no mobile */}
+        <Card style={ isMobile ? { gridColumn: "1 / -1" } : {} }>
+          <HealthScore score={healthScore} />
+        </Card>
       </div>
 
       {/* Row 2: Bar chart + Heatmap */}
-      <div style={{ display:"grid", gridTemplateColumns:"1.4fr 1fr", gap:12, marginBottom:12 }}>
+      <div style={{ display:"grid", gridTemplateColumns: col2bar, gap, marginBottom: gap }}>
         <Card>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Receitas × Despesas</div>
           {monthlyData.length < 2 ? empty("Acumule mais meses para ver o gráfico") :
-            <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={monthlyData} barSize={13} barGap={3}>
+            <ResponsiveContainer width="100%" height={isMobile ? 160 : 190}>
+              <BarChart data={monthlyData} barSize={isMobile ? 10 : 13} barGap={3}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize:11, fill:"var(--muted)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:"var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v=>`R$${(v/1000).toFixed(0)}k`} />
+                <XAxis dataKey="name" tick={{ fontSize:10, fill:"var(--muted)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize:10, fill:"var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v=>`R$${(v/1000).toFixed(0)}k`} width={45} />
                 <Tooltip formatter={v=>fmt(v)} contentStyle={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, fontSize:12 }} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize:12 }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize:11 }} />
                 <Bar dataKey="Receitas" fill="var(--green)" radius={[4,4,0,0]} />
                 <Bar dataKey="Despesas" fill="var(--red)"   radius={[4,4,0,0]} />
               </BarChart>
@@ -375,11 +375,11 @@ export default function Dashboard({ userId }) {
       </div>
 
       {/* Row 3: Treemap + Accumulated balance */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+      <div style={{ display:"grid", gridTemplateColumns: col2, gap, marginBottom: gap }}>
         <Card>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Gastos por Categoria</div>
           {treemapData.length === 0 ? empty("Sem despesas no mês") :
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={isMobile ? 160 : 200}>
               <Treemap data={treemapData} dataKey="value" aspectRatio={4/3} content={<CustomTreemapContent />}>
                 <Tooltip formatter={v=>fmt(v)} contentStyle={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, fontSize:12 }} />
               </Treemap>
@@ -389,11 +389,11 @@ export default function Dashboard({ userId }) {
         <Card>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Saldo Acumulado</div>
           {accumulatedBalance.length < 2 ? empty("Acumule mais meses para ver") :
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={isMobile ? 160 : 200}>
               <LineChart data={accumulatedBalance}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize:11, fill:"var(--muted)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:"var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v=>`R$${(v/1000).toFixed(1)}k`} />
+                <XAxis dataKey="name" tick={{ fontSize:10, fill:"var(--muted)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize:10, fill:"var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v=>`R$${(v/1000).toFixed(1)}k`} width={45} />
                 <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
                 <Tooltip formatter={v=>fmt(v)} contentStyle={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, fontSize:12 }} />
                 <Line type="monotone" dataKey="Patrimônio" stroke="var(--accent)" strokeWidth={2.5} dot={{ r:4, fill:"var(--accent)" }} />
@@ -404,17 +404,17 @@ export default function Dashboard({ userId }) {
       </div>
 
       {/* Row 4: Debt evolution + Savings */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+      <div style={{ display:"grid", gridTemplateColumns: col2, gap, marginBottom: gap }}>
         <Card>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Evolução de Dívidas</div>
           {debtEvolution.length === 0 ? empty("Sem parcelas registradas") :
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={isMobile ? 150 : 180}>
               <LineChart data={debtEvolution}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize:11, fill:"var(--muted)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:"var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v=>`R$${(v/1000).toFixed(1)}k`} />
+                <XAxis dataKey="name" tick={{ fontSize:10, fill:"var(--muted)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize:10, fill:"var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v=>`R$${(v/1000).toFixed(1)}k`} width={45} />
                 <Tooltip formatter={v=>fmt(v)} contentStyle={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, fontSize:12 }} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize:12 }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize:11 }} />
                 <Line type="monotone" dataKey="Em aberto" stroke="var(--red)"   strokeWidth={2} dot={{ r:3 }} />
                 <Line type="monotone" dataKey="Pago"      stroke="var(--green)" strokeWidth={2} dot={{ r:3 }} />
               </LineChart>
@@ -453,7 +453,7 @@ export default function Dashboard({ userId }) {
 
       {/* Row 5: Card gauges + Goal rings */}
       {(cardUsage.length > 0 || goals.length > 0) && (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+        <div style={{ display:"grid", gridTemplateColumns: col2, gap, marginBottom: gap }}>
           {cardUsage.length > 0 && (
             <Card>
               <div style={{ fontWeight:700, fontSize:14, marginBottom:12, color:"var(--text)" }}>Limite dos Cartões</div>
@@ -489,7 +489,7 @@ export default function Dashboard({ userId }) {
                   <div style={{ fontSize:11, color:"var(--muted)", marginTop:1 }}>{tx.cat} · {tx.date}</div>
                 </div>
               </div>
-              <div style={{ fontWeight:700, fontSize:13, color:tx.type==="receita"?"var(--green)":"var(--red)" }}>
+              <div style={{ fontWeight:700, fontSize:13, color:tx.type==="receita"?"var(--green)":"var(--red)", flexShrink:0, marginLeft:8 }}>
                 {tx.type==="receita"?"+":"-"}{fmt(tx.value)}
               </div>
             </div>

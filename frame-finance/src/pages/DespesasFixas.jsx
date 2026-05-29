@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 import { loadCategories } from "../lib/categories";
 
@@ -72,6 +73,7 @@ async function ensurePayments(userId, expenses) {
 }
 
 export default function DespesasFixas({ userId }) {
+  const isMobile = useIsMobile();
   const [expenses, setExpenses]   = useState([]);
   const [payments, setPayments]   = useState([]);
   const [categories, setCategories] = useState({ despesa: [] });
@@ -176,7 +178,7 @@ export default function DespesasFixas({ userId }) {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
         {[
           { label: "Total do mês",  value: fmt(totalMonth),   color: "var(--text)" },
           { label: "Pago",          value: fmt(totalPaid),    color: "var(--green)" },

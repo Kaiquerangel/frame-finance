@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -10,6 +11,7 @@ const inp = {
 };
 
 export default function Metas({ userId }) {
+  const isMobile = useIsMobile();
   const [goals, setGoals]       = useState([]);
   const [form, setForm]         = useState({ name: "", target: "", saved: "" });
   const [loading, setLoading]   = useState(false);
@@ -50,7 +52,7 @@ export default function Metas({ userId }) {
       {/* Form */}
       <div style={{ background: "var(--surface)", borderRadius: 18, padding: 24, border: "1px solid var(--border)", marginBottom: 28 }}>
         <div style={{ fontWeight: 700, marginBottom: 18, fontFamily: "Syne", color: "var(--text)" }}>Nova Meta</div>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr auto", gap: 12, alignItems: "end" }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".04em" }}>Nome</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: Viagem Europa" style={inp} />
@@ -74,7 +76,7 @@ export default function Metas({ userId }) {
       </div>
 
       {/* Goals grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px,1fr))", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px,1fr))", gap: 18 }}>
         {goals.length === 0
           ? <div style={{ background: "var(--surface)", borderRadius: 18, padding: 40, textAlign: "center", color: "var(--muted)", border: "1px solid var(--border)" }}>
               Nenhuma meta criada ainda

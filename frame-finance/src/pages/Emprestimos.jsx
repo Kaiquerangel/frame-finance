@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -22,6 +23,7 @@ const Label = ({ children }) => (
 );
 
 export default function Emprestimos({ userId }) {
+  const isMobile = useIsMobile();
   const [loans, setLoans]         = useState([]);
   const [installments, setInstallments] = useState([]);
   const [cards, setCards]         = useState([]);
@@ -141,7 +143,7 @@ export default function Emprestimos({ userId }) {
           <Card style={{ marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, color: "var(--text)" }}>Novo Empréstimo</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <div>
                   <Label>Tipo</Label>
                   <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inp}>
@@ -259,7 +261,7 @@ export default function Emprestimos({ userId }) {
             </div>
 
             {/* Summary */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 16 }}>
               {[
                 { label: "Total pago", value: fmt(totalPaid), color: "var(--green)" },
                 { label: "Total em juros", value: fmt(totalInterest), color: "var(--red)" },

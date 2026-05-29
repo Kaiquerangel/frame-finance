@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
+import { loadCategories } from "../lib/categories";
 import { supabase } from "../lib/supabase";
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
@@ -19,6 +21,7 @@ const Card = ({ children, style = {} }) => (
 );
 
 export default function Orcamento({ userId }) {
+  const isMobile = useIsMobile();
   const [budgets, setBudgets]           = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [month, setMonth]               = useState(today());
@@ -82,7 +85,7 @@ export default function Orcamento({ userId }) {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
         {[
           { label: "Orçamento total",  value: totalBudget, color: "var(--accent)" },
           { label: "Total gasto",       value: totalSpent,  color: totalSpent > totalBudget ? "var(--red)" : "var(--text)" },
@@ -98,7 +101,7 @@ export default function Orcamento({ userId }) {
       {/* Form */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: "var(--text)" }}>Definir orçamento</div>
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <div style={{ display: isMobile ? "grid" : "flex", gridTemplateColumns: "1fr", gap: 10, alignItems: "flex-end" }}>
           <div style={{ flex: 2 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Categoria</div>
             <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={inp}>

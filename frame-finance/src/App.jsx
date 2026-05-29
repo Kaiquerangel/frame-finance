@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -23,18 +23,18 @@ const THEMES = [
 ];
 
 const NAV = [
-  { id: "dashboard",   label: "Dashboard",     icon: "⊟", group: "main" },
-  { id: "receitas",    label: "Receitas",       icon: "↑", group: "main" },
-  { id: "lancamentos",    label: "Lançamentos",    icon: "↕", group: "main" },
-  { id: "despesasfixas", label: "Despesas Fixas",  icon: "📌", group: "main" },
-  { id: "compras",     label: "Compras",        icon: "◻", group: "main" },
-  { id: "cartoes",     label: "Cartões",        icon: "▭", group: "credito" },
-  { id: "emprestimos", label: "Empréstimos",    icon: "⊕", group: "credito" },
-  { id: "orcamento",   label: "Orçamento",      icon: "◑", group: "planej" },
-  { id: "metas",       label: "Metas",          icon: "◎", group: "planej" },
-  { id: "relatorios",  label: "Relatórios",     icon: "≡", group: "planej" },
-  { id: "historico",    label: "Histórico",      icon: "⏱", group: "planej" },
-  { id: "categorias",  label: "Categorias",     icon: "⊞", group: "config" },
+  { id: "dashboard",    label: "Dashboard",     icon: "⊟", group: "main" },
+  { id: "receitas",     label: "Receitas",       icon: "↑",  group: "main" },
+  { id: "lancamentos",  label: "Lançamentos",    icon: "↕",  group: "main" },
+  { id: "despesasfixas",label: "Despesas Fixas", icon: "📌", group: "main" },
+  { id: "compras",      label: "Compras",        icon: "◻",  group: "main" },
+  { id: "cartoes",      label: "Cartões",        icon: "▭",  group: "credito" },
+  { id: "emprestimos",  label: "Empréstimos",    icon: "⊕",  group: "credito" },
+  { id: "orcamento",    label: "Orçamento",      icon: "◑",  group: "planej" },
+  { id: "metas",        label: "Metas",          icon: "◎",  group: "planej" },
+  { id: "relatorios",   label: "Relatórios",     icon: "≡",  group: "planej" },
+  { id: "historico",    label: "Histórico",      icon: "⏱",  group: "planej" },
+  { id: "categorias",   label: "Categorias",     icon: "⊞",  group: "config" },
 ];
 
 const GROUPS = {
@@ -44,6 +44,20 @@ const GROUPS = {
   config:  { label: "Configurações" },
 };
 
+// Itens fixos na bottom bar
+const BOTTOM_NAV = ["dashboard", "lancamentos", "cartoes", "metas"];
+
+// Hook para detectar mobile
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
+
 export default function App() {
   const [session, setSession]       = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -51,6 +65,9 @@ export default function App() {
   const [theme, setTheme]           = useState(() => localStorage.getItem("ff_theme") || "blue");
   const [profile, setProfile]       = useState(null);
   const [showPerfil, setShowPerfil] = useState(false);
+  const [showMore, setShowMore]     = useState(false);
+  const isMobile                    = useIsMobile();
+  const moreRef                     = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false); });
@@ -65,9 +82,24 @@ export default function App() {
 
   useEffect(() => { if (session?.user) loadProfile(); }, [session]);
 
+  // Fecha menu "Mais" ao clicar fora
+  useEffect(() => {
+    if (!showMore) return;
+    const handler = (e) => {
+      if (moreRef.current && !moreRef.current.contains(e.target)) setShowMore(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMore]);
+
   const loadProfile = async () => {
     const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
     setProfile(data);
+  };
+
+  const navigate = (id) => {
+    setPage(id);
+    setShowMore(false);
   };
 
   if (loading) return (
@@ -78,15 +110,211 @@ export default function App() {
 
   if (!session) return <Auth />;
 
-  const pages = { dashboard: Dashboard, receitas: Receitas, lancamentos: Lancamentos, compras: Compras, despesasfixas: DespesasFixas, cartoes: Cartoes, emprestimos: Emprestimos, orcamento: Orcamento, relatorios: Relatorios, metas: Metas, categorias: Categorias, historico: Historico };
+  const pages = {
+    dashboard: Dashboard, receitas: Receitas, lancamentos: Lancamentos,
+    compras: Compras, despesasfixas: DespesasFixas, cartoes: Cartoes,
+    emprestimos: Emprestimos, orcamento: Orcamento, relatorios: Relatorios,
+    metas: Metas, categorias: Categorias, historico: Historico,
+  };
   const PageComponent = pages[page];
   const initials = profile ? `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase() : "?";
+  const currentNav = NAV.find(n => n.id === page);
 
-  // Group nav items
   const groupedNav = Object.entries(GROUPS).map(([gid, { label }]) => ({
     gid, label, items: NAV.filter(n => n.group === gid),
   }));
 
+  // Páginas do menu "Mais" (tudo que não está na bottom bar)
+  const morePages = NAV.filter(n => !BOTTOM_NAV.includes(n.id));
+
+  // ── MOBILE ────────────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--bg)" }}>
+
+        {/* Header mobile */}
+        <header style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+          background: "var(--surface)", borderBottom: "1px solid var(--border)",
+          padding: "12px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          height: 56,
+        }}>
+          {/* Nome da página atual */}
+          <div style={{ fontWeight: 800, fontSize: 16, color: "var(--text)", letterSpacing: "-.01em" }}>
+            {currentNav?.label || "Frame Finance"}
+          </div>
+
+          {/* Avatar */}
+          <button onClick={() => setShowPerfil(true)} style={{
+            background: "none", border: "none", cursor: "pointer", padding: 0,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            {profile?.avatar_url
+              ? <img src={profile.avatar_url} alt="" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border)" }} />
+              : <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>{initials}</div>
+            }
+          </button>
+        </header>
+
+        {/* Conteúdo — espaço para header (56px) + bottom bar (72px) */}
+        <main style={{ flex: 1, padding: "72px 16px 88px", overflowY: "auto" }}>
+          <PageComponent userId={session.user.id} />
+        </main>
+
+        {/* Menu "Mais" — sheet que sobe de baixo */}
+        {showMore && (
+          <>
+            {/* Overlay */}
+            <div onClick={() => setShowMore(false)} style={{
+              position: "fixed", inset: 0, zIndex: 150,
+              background: "rgba(0,0,0,.4)", backdropFilter: "blur(2px)",
+            }} />
+            {/* Sheet */}
+            <div ref={moreRef} style={{
+              position: "fixed", bottom: 72, left: 0, right: 0, zIndex: 200,
+              background: "var(--surface)", borderRadius: "20px 20px 0 0",
+              padding: "8px 0 16px",
+              boxShadow: "0 -4px 30px rgba(0,0,0,.15)",
+              border: "1px solid var(--border)",
+            }}>
+              {/* Handle */}
+              <div style={{ width: 36, height: 4, borderRadius: 99, background: "var(--border)", margin: "8px auto 16px" }} />
+
+              {/* Título */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".1em", padding: "0 20px", marginBottom: 8 }}>
+                Mais opções
+              </div>
+
+              {/* Itens agrupados */}
+              {Object.entries(GROUPS).map(([gid, { label }]) => {
+                const items = morePages.filter(n => n.group === gid);
+                if (items.length === 0) return null;
+                return (
+                  <div key={gid}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em", padding: "10px 20px 4px" }}>
+                      {label}
+                    </div>
+                    {items.map(n => {
+                      const active = page === n.id;
+                      return (
+                        <button key={n.id} onClick={() => navigate(n.id)} style={{
+                          width: "100%", display: "flex", alignItems: "center", gap: 14,
+                          padding: "13px 20px", border: "none", cursor: "pointer",
+                          background: active ? "var(--accentbg)" : "transparent",
+                          color: active ? "var(--accent)" : "var(--text)",
+                          fontSize: 15, fontWeight: active ? 700 : 400,
+                          textAlign: "left",
+                        }}>
+                          <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{n.icon}</span>
+                          {n.label}
+                          {active && <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {/* Divider */}
+              <div style={{ height: 1, background: "var(--border)", margin: "12px 20px" }} />
+
+              {/* Tema */}
+              <div style={{ padding: "0 20px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>Tema</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {THEMES.map(t => (
+                    <button key={t.id} onClick={() => setTheme(t.id)} style={{
+                      width: 28, height: 28, borderRadius: 8, background: t.color,
+                      border: theme === t.id ? "3px solid var(--text)" : "3px solid transparent",
+                      cursor: "pointer", transition: "border .12s",
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Sair */}
+              <button onClick={() => supabase.auth.signOut()} style={{
+                width: "calc(100% - 40px)", margin: "14px 20px 0",
+                padding: "12px 0", borderRadius: 10, border: "none",
+                background: "rgba(220,38,38,.1)", color: "#ef4444",
+                fontWeight: 700, fontSize: 14, cursor: "pointer",
+              }}>
+                Sair
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Bottom Navigation Bar */}
+        <nav style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: "var(--surface)", borderTop: "1px solid var(--border)",
+          display: "flex", alignItems: "stretch",
+          height: 72,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}>
+          {/* Itens fixos */}
+          {BOTTOM_NAV.map(id => {
+            const n = NAV.find(x => x.id === id);
+            const active = page === n.id && !showMore;
+            return (
+              <button key={n.id} onClick={() => navigate(n.id)} style={{
+                flex: 1, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 4,
+                border: "none", background: "transparent", cursor: "pointer",
+                color: active ? "var(--accent)" : "var(--muted)",
+                transition: "color .15s",
+                padding: "8px 0",
+              }}>
+                {/* Indicador ativo */}
+                <div style={{
+                  width: active ? 32 : 0, height: 3, borderRadius: 99,
+                  background: "var(--accent)", marginBottom: 2,
+                  transition: "width .2s",
+                  position: "absolute", top: 0,
+                }} />
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{n.icon}</span>
+                <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: ".01em" }}>
+                  {n.label}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Botão "Mais" */}
+          <button onClick={() => setShowMore(v => !v)} style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 4,
+            border: "none", background: "transparent", cursor: "pointer",
+            color: showMore ? "var(--accent)" : "var(--muted)",
+            transition: "color .15s",
+            padding: "8px 0",
+          }}>
+            <div style={{
+              width: showMore ? 32 : 0, height: 3, borderRadius: 99,
+              background: "var(--accent)", marginBottom: 2,
+              transition: "width .2s",
+              position: "absolute", top: 0,
+            }} />
+            {/* Ícone hamburguer estilo moderno */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+              <div style={{ width: 18, height: 2, borderRadius: 99, background: "currentColor" }} />
+              <div style={{ width: 12, height: 2, borderRadius: 99, background: "currentColor" }} />
+              <div style={{ width: 18, height: 2, borderRadius: 99, background: "currentColor" }} />
+            </div>
+            <span style={{ fontSize: 10, fontWeight: showMore ? 700 : 400 }}>Mais</span>
+          </button>
+        </nav>
+
+        {showPerfil && (
+          <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
+        )}
+      </div>
+    );
+  }
+
+  // ── DESKTOP ───────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
@@ -181,7 +409,9 @@ export default function App() {
         </div>
       </main>
 
-      {showPerfil && <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />}
+      {showPerfil && (
+        <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
+      )}
     </div>
   );
 }

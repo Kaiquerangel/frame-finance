@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 
 const DEFAULT_CATS = { receita: ["Salário","Freelance","Investimentos","Outros"], despesa: ["Moradia","Alimentação","Transporte","Saúde","Lazer","Educação","Outros"] };
@@ -10,6 +11,7 @@ const inp = {
 };
 
 export default function Categorias({ userId }) {
+  const isMobile = useIsMobile();
   const [custom, setCustom]   = useState([]);
   const [form, setForm]       = useState({ type: "despesa", name: "" });
   const [loading, setLoading] = useState(false);
@@ -48,7 +50,7 @@ export default function Categorias({ userId }) {
       {/* Form */}
       <div style={{ background: "var(--surface)", borderRadius: 18, padding: 24, border: "1px solid var(--border)", marginBottom: 28 }}>
         <div style={{ fontWeight: 700, marginBottom: 18, fontFamily: "Syne", color: "var(--text)" }}>Nova Categoria</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr auto", gap: 12, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 2fr auto", gap: 12, alignItems: "end" }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".04em" }}>Tipo</label>
             <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inp}>
@@ -73,7 +75,7 @@ export default function Categorias({ userId }) {
       </div>
 
       {/* Lists */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 18 }}>
         {["receita", "despesa"].map(type => (
           <div key={type} style={{ background: "var(--surface)", borderRadius: 18, padding: 24, border: "1px solid var(--border)" }}>
             <div style={{ fontWeight: 700, fontFamily: "Syne", marginBottom: 18, color: "var(--text)" }}>

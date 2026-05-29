@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -21,6 +22,7 @@ const Card = ({ children, style = {} }) => (
 );
 
 export default function Receitas({ userId }) {
+  const isMobile = useIsMobile();
   const [revenues, setRevenues] = useState([]);
   const [filterMonth, setFilterMonth] = useState(today().slice(0, 7));
   const [loading, setLoading] = useState(false);
@@ -80,7 +82,7 @@ export default function Receitas({ userId }) {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
         {[
           { label: "Este mês", value: totalMonth, color: "var(--green)" },
           { label: `Ano ${filterMonth.slice(0,4)}`, value: totalYear, color: "var(--accent)" },
@@ -88,13 +90,13 @@ export default function Receitas({ userId }) {
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>{label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color, letterSpacing: "-.02em" }}>{fmt(value)}</div>
+            <div style={{ fontSize: isMobile ? 16 : 22, fontWeight: 800, color, letterSpacing: "-.02em" }}>{fmt(value)}</div>
           </Card>
         ))}
       </div>
 
       {/* Chart + Categories */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.6fr 1fr", gap: 12, marginBottom: 16 }}>
         <Card>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, color: "var(--text)" }}>Evolução de receitas</div>
           {chartData.length === 0
@@ -135,7 +137,7 @@ export default function Receitas({ userId }) {
       {/* Form */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, color: "var(--text)" }}>Nova Receita</div>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Descrição</div>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Salário maio" style={inp} />
