@@ -1,19 +1,27 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Receitas from "./pages/Receitas";
-import Lancamentos from "./pages/Lancamentos";
-import Compras from "./pages/Compras";
+import {
+  getWelcomed, getTourDone, getTourRepeat, resetTour,
+} from "./lib/onboarding";
+import { useIsMobile } from "./lib/useIsMobile";
+
+import Auth          from "./pages/Auth";
+import Dashboard     from "./pages/Dashboard";
+import Receitas      from "./pages/Receitas";
+import Lancamentos   from "./pages/Lancamentos";
+import Compras       from "./pages/Compras";
 import DespesasFixas from "./pages/DespesasFixas";
-import Cartoes from "./pages/Cartoes";
-import Emprestimos from "./pages/Emprestimos";
-import Orcamento from "./pages/Orcamento";
-import Relatorios from "./pages/Relatorios";
-import Metas from "./pages/Metas";
-import Categorias from "./pages/Categorias";
-import Perfil from "./pages/Perfil";
-import Historico from "./pages/Historico";
+import Cartoes       from "./pages/Cartoes";
+import Emprestimos   from "./pages/Emprestimos";
+import Orcamento     from "./pages/Orcamento";
+import Relatorios    from "./pages/Relatorios";
+import Metas         from "./pages/Metas";
+import Categorias    from "./pages/Categorias";
+import Perfil        from "./pages/Perfil";
+import Historico     from "./pages/Historico";
+import Aprendendo    from "./pages/Aprendendo";
+import Welcome       from "./components/Welcome";
+import Tour          from "./components/Tour";
 
 const THEMES = [
   { id: "blue",  color: "#7c3aed" },
@@ -23,18 +31,18 @@ const THEMES = [
 ];
 
 const NAV = [
-  { id: "dashboard",    label: "Dashboard",     icon: "⊟", group: "main" },
-  { id: "receitas",     label: "Receitas",       icon: "↑",  group: "main" },
-  { id: "lancamentos",  label: "Lançamentos",    icon: "↕",  group: "main" },
-  { id: "despesasfixas",label: "Despesas Fixas", icon: "📌", group: "main" },
-  { id: "compras",      label: "Compras",        icon: "◻",  group: "main" },
-  { id: "cartoes",      label: "Cartões",        icon: "▭",  group: "credito" },
-  { id: "emprestimos",  label: "Empréstimos",    icon: "⊕",  group: "credito" },
-  { id: "orcamento",    label: "Orçamento",      icon: "◑",  group: "planej" },
-  { id: "metas",        label: "Metas",          icon: "◎",  group: "planej" },
-  { id: "relatorios",   label: "Relatórios",     icon: "≡",  group: "planej" },
-  { id: "historico",    label: "Histórico",      icon: "⏱",  group: "planej" },
-  { id: "categorias",   label: "Categorias",     icon: "⊞",  group: "config" },
+  { id: "dashboard",    label: "Dashboard",        icon: "⊟", group: "main" },
+  { id: "receitas",     label: "Receitas",          icon: "↑",  group: "main" },
+  { id: "lancamentos",  label: "Lançamentos",       icon: "↕",  group: "main" },
+  { id: "despesasfixas",label: "Despesas Fixas",    icon: "📌", group: "main" },
+  { id: "compras",      label: "Compras",           icon: "◻",  group: "main" },
+  { id: "cartoes",      label: "Cartões",           icon: "▭",  group: "credito" },
+  { id: "emprestimos",  label: "Empréstimos",       icon: "⊕",  group: "credito" },
+  { id: "orcamento",    label: "Orçamento",         icon: "◑",  group: "planej" },
+  { id: "metas",        label: "Metas",             icon: "◎",  group: "planej" },
+  { id: "relatorios",   label: "Relatórios",        icon: "≡",  group: "planej" },
+  { id: "historico",    label: "Histórico",         icon: "⏱",  group: "planej" },
+  { id: "categorias",   label: "Categorias",        icon: "⊞",  group: "config" },
 ];
 
 const GROUPS = {
@@ -44,33 +52,26 @@ const GROUPS = {
   config:  { label: "Configurações" },
 };
 
-// Itens fixos na bottom bar
 const BOTTOM_NAV = ["dashboard", "lancamentos", "cartoes", "metas"];
 
-// Hook para detectar mobile
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
-  return isMobile;
-}
-
 export default function App() {
-  const [session, setSession]       = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [page, setPage]             = useState("dashboard");
-  const [theme, setTheme]           = useState(() => localStorage.getItem("ff_theme") || "blue");
-  const [profile, setProfile]       = useState(null);
-  const [showPerfil, setShowPerfil] = useState(false);
-  const [showMore, setShowMore]     = useState(false);
-  const isMobile                    = useIsMobile();
-  const moreRef                     = useRef(null);
+  const [session, setSession]         = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [page, setPage]               = useState("dashboard");
+  const [theme, setTheme]             = useState(() => localStorage.getItem("ff_theme") || "blue");
+  const [profile, setProfile]         = useState(null);
+  const [showPerfil, setShowPerfil]   = useState(false);
+  const [showMore, setShowMore]       = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showTour, setShowTour]       = useState(false);
+  const isMobile                      = useIsMobile();
+  const moreRef                       = useRef(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false); });
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
@@ -82,7 +83,15 @@ export default function App() {
 
   useEffect(() => { if (session?.user) loadProfile(); }, [session]);
 
-  // Fecha menu "Mais" ao clicar fora
+  useEffect(() => {
+    if (!session) return;
+    if (!getWelcomed()) {
+      setShowWelcome(true);
+    } else if (!getTourDone() || getTourRepeat()) {
+      setTimeout(() => setShowTour(true), 600);
+    }
+  }, [session]);
+
   useEffect(() => {
     if (!showMore) return;
     const handler = (e) => {
@@ -102,6 +111,22 @@ export default function App() {
     setShowMore(false);
   };
 
+  const handleStartTour = () => {
+    setShowWelcome(false);
+    setShowTour(true);
+  };
+
+  const handleTourEnd = () => {
+    setShowTour(false);
+    setPage("dashboard");
+  };
+
+  const handleStartTourManual = () => {
+    resetTour();
+    setShowTour(true);
+    setShowMore(false);
+  };
+
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg)" }}>
       <div style={{ fontSize: 18, fontWeight: 800, color: "var(--accent)" }}>Frame Finance</div>
@@ -115,24 +140,63 @@ export default function App() {
     compras: Compras, despesasfixas: DespesasFixas, cartoes: Cartoes,
     emprestimos: Emprestimos, orcamento: Orcamento, relatorios: Relatorios,
     metas: Metas, categorias: Categorias, historico: Historico,
+    aprendendo: Aprendendo,
   };
-  const PageComponent = pages[page];
-  const initials = profile ? `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase() : "?";
+
+  const PageComponent = pages[page] || Dashboard;
+  const initials = profile
+    ? `${profile.first_name?.[0] || ""}${profile.last_name?.[0] || ""}`.toUpperCase()
+    : "?";
   const currentNav = NAV.find(n => n.id === page);
+  const currentLabel = page === "aprendendo" ? "Aprendendo a Usar" : currentNav?.label || "Frame Finance";
 
   const groupedNav = Object.entries(GROUPS).map(([gid, { label }]) => ({
     gid, label, items: NAV.filter(n => n.group === gid),
   }));
-
-  // Páginas do menu "Mais" (tudo que não está na bottom bar)
   const morePages = NAV.filter(n => !BOTTOM_NAV.includes(n.id));
 
-  // ── MOBILE ────────────────────────────────────────────────────────────────
+  // Botões de ajuda — aparecem próximos em ambos os layouts
+  const HelpButtons = ({ inSheet = false }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: inSheet ? "0 20px" : "8px 0" }}>
+      <button onClick={() => { navigate("aprendendo"); }} style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: inSheet ? "11px 14px" : "8px 10px",
+        borderRadius: 9, border: "none", cursor: "pointer",
+        background: page === "aprendendo"
+          ? "rgba(255,255,255,.12)"
+          : inSheet ? "var(--accentbg)" : "rgba(255,255,255,.06)",
+        color: inSheet ? "var(--accent)" : "var(--sid-muted)",
+        fontSize: inSheet ? 14 : 12, fontWeight: 700, textAlign: "left",
+        width: "100%",
+      }}>
+        <span style={{ fontSize: inSheet ? 18 : 14 }}>📖</span>
+        Aprendendo a usar
+      </button>
+      <button onClick={handleStartTourManual} style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: inSheet ? "11px 14px" : "8px 10px",
+        borderRadius: 9, border: "none", cursor: "pointer",
+        background: inSheet ? "var(--bg)" : "rgba(255,255,255,.06)",
+        color: inSheet ? "var(--text)" : "var(--sid-muted)",
+        fontSize: inSheet ? 14 : 12, fontWeight: 600, textAlign: "left",
+        width: "100%",
+        border: inSheet ? "1px solid var(--border)" : "none",
+      }}>
+        <span style={{ fontSize: inSheet ? 18 : 14 }}>🗺️</span>
+        Ver tour do app
+      </button>
+    </div>
+  );
+
+  // ── MOBILE ──────────────────────────────────────────────────────────────────
   if (isMobile) {
     return (
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--bg)" }}>
 
-        {/* Header mobile */}
+        {showWelcome && <Welcome onStartTour={handleStartTour} onSkip={() => setShowWelcome(false)} />}
+        {showTour && !showWelcome && <Tour onNavigate={navigate} onEnd={handleTourEnd} />}
+
+        {/* Header */}
         <header style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
           background: "var(--surface)", borderBottom: "1px solid var(--border)",
@@ -140,16 +204,10 @@ export default function App() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           height: 56,
         }}>
-          {/* Nome da página atual */}
           <div style={{ fontWeight: 800, fontSize: 16, color: "var(--text)", letterSpacing: "-.01em" }}>
-            {currentNav?.label || "Frame Finance"}
+            {currentLabel}
           </div>
-
-          {/* Avatar */}
-          <button onClick={() => setShowPerfil(true)} style={{
-            background: "none", border: "none", cursor: "pointer", padding: 0,
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
+          <button onClick={() => setShowPerfil(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
             {profile?.avatar_url
               ? <img src={profile.avatar_url} alt="" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border)" }} />
               : <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff" }}>{initials}</div>
@@ -157,54 +215,48 @@ export default function App() {
           </button>
         </header>
 
-        {/* Conteúdo — espaço para header (56px) + bottom bar (72px) */}
+        {/* Conteúdo */}
         <main style={{ flex: 1, padding: "72px 16px 88px", overflowY: "auto" }}>
-          <PageComponent userId={session.user.id} />
+          <PageComponent
+            userId={session.user.id}
+            onNavigate={navigate}
+            onStartTour={handleStartTourManual}
+          />
         </main>
 
-        {/* Menu "Mais" — sheet que sobe de baixo */}
+        {/* Menu Mais */}
         {showMore && (
           <>
-            {/* Overlay */}
             <div onClick={() => setShowMore(false)} style={{
               position: "fixed", inset: 0, zIndex: 150,
               background: "rgba(0,0,0,.4)", backdropFilter: "blur(2px)",
             }} />
-            {/* Sheet */}
             <div ref={moreRef} style={{
               position: "fixed", bottom: 72, left: 0, right: 0, zIndex: 200,
               background: "var(--surface)", borderRadius: "20px 20px 0 0",
-              padding: "8px 0 16px",
+              padding: "8px 0 20px",
               boxShadow: "0 -4px 30px rgba(0,0,0,.15)",
               border: "1px solid var(--border)",
+              maxHeight: "80vh", overflowY: "auto",
             }}>
-              {/* Handle */}
               <div style={{ width: 36, height: 4, borderRadius: 99, background: "var(--border)", margin: "8px auto 16px" }} />
 
-              {/* Título */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".1em", padding: "0 20px", marginBottom: 8 }}>
-                Mais opções
-              </div>
-
-              {/* Itens agrupados */}
+              {/* Páginas agrupadas */}
               {Object.entries(GROUPS).map(([gid, { label }]) => {
                 const items = morePages.filter(n => n.group === gid);
                 if (items.length === 0) return null;
                 return (
                   <div key={gid}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em", padding: "10px 20px 4px" }}>
-                      {label}
-                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em", padding: "10px 20px 4px" }}>{label}</div>
                     {items.map(n => {
                       const active = page === n.id;
                       return (
-                        <button key={n.id} onClick={() => navigate(n.id)} style={{
+                        <button key={n.id} id={`nav-${n.id}`} onClick={() => navigate(n.id)} style={{
                           width: "100%", display: "flex", alignItems: "center", gap: 14,
                           padding: "13px 20px", border: "none", cursor: "pointer",
                           background: active ? "var(--accentbg)" : "transparent",
                           color: active ? "var(--accent)" : "var(--text)",
-                          fontSize: 15, fontWeight: active ? 700 : 400,
-                          textAlign: "left",
+                          fontSize: 15, fontWeight: active ? 700 : 400, textAlign: "left",
                         }}>
                           <span style={{ fontSize: 18, width: 24, textAlign: "center" }}>{n.icon}</span>
                           {n.label}
@@ -216,88 +268,76 @@ export default function App() {
                 );
               })}
 
-              {/* Divider */}
-              <div style={{ height: 1, background: "var(--border)", margin: "12px 20px" }} />
+              {/* Divider + Ajuda */}
+              <div style={{ height: 1, background: "var(--border)", margin: "12px 20px 14px" }} />
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em", padding: "0 20px 8px" }}>Ajuda</div>
+              <HelpButtons inSheet />
 
-              {/* Tema */}
-              <div style={{ padding: "0 20px" }}>
+              {/* Divider + Tema + Sair */}
+              <div style={{ height: 1, background: "var(--border)", margin: "14px 20px 14px" }} />
+              <div style={{ padding: "0 20px 8px" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: 10 }}>Tema</div>
                 <div style={{ display: "flex", gap: 10 }}>
                   {THEMES.map(t => (
                     <button key={t.id} onClick={() => setTheme(t.id)} style={{
                       width: 28, height: 28, borderRadius: 8, background: t.color,
                       border: theme === t.id ? "3px solid var(--text)" : "3px solid transparent",
-                      cursor: "pointer", transition: "border .12s",
+                      cursor: "pointer",
                     }} />
                   ))}
                 </div>
               </div>
 
-              {/* Sair */}
               <button onClick={() => supabase.auth.signOut()} style={{
-                width: "calc(100% - 40px)", margin: "14px 20px 0",
+                width: "calc(100% - 40px)", margin: "8px 20px 0",
                 padding: "12px 0", borderRadius: 10, border: "none",
                 background: "rgba(220,38,38,.1)", color: "#ef4444",
                 fontWeight: 700, fontSize: 14, cursor: "pointer",
-              }}>
-                Sair
-              </button>
+              }}>Sair</button>
             </div>
           </>
         )}
 
-        {/* Bottom Navigation Bar */}
+        {/* Bottom Nav */}
         <nav style={{
           position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
           background: "var(--surface)", borderTop: "1px solid var(--border)",
-          display: "flex", alignItems: "stretch",
-          height: 72,
+          display: "flex", alignItems: "stretch", height: 72,
           paddingBottom: "env(safe-area-inset-bottom)",
         }}>
-          {/* Itens fixos */}
           {BOTTOM_NAV.map(id => {
             const n = NAV.find(x => x.id === id);
             const active = page === n.id && !showMore;
             return (
-              <button key={n.id} onClick={() => navigate(n.id)} style={{
+              <button key={n.id} id={`nav-${n.id}`} onClick={() => navigate(n.id)} style={{
                 flex: 1, display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", gap: 4,
                 border: "none", background: "transparent", cursor: "pointer",
                 color: active ? "var(--accent)" : "var(--muted)",
-                transition: "color .15s",
-                padding: "8px 0",
+                transition: "color .15s", padding: "8px 0", position: "relative",
               }}>
-                {/* Indicador ativo */}
                 <div style={{
                   width: active ? 32 : 0, height: 3, borderRadius: 99,
-                  background: "var(--accent)", marginBottom: 2,
-                  transition: "width .2s",
+                  background: "var(--accent)", transition: "width .2s",
                   position: "absolute", top: 0,
                 }} />
                 <span style={{ fontSize: 20, lineHeight: 1 }}>{n.icon}</span>
-                <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: ".01em" }}>
-                  {n.label}
-                </span>
+                <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{n.label}</span>
               </button>
             );
           })}
-
-          {/* Botão "Mais" */}
           <button onClick={() => setShowMore(v => !v)} style={{
             flex: 1, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center", gap: 4,
             border: "none", background: "transparent", cursor: "pointer",
             color: showMore ? "var(--accent)" : "var(--muted)",
-            transition: "color .15s",
-            padding: "8px 0",
+            transition: "color .15s", padding: "8px 0", position: "relative",
           }}>
             <div style={{
               width: showMore ? 32 : 0, height: 3, borderRadius: 99,
-              background: "var(--accent)", marginBottom: 2,
-              transition: "width .2s",
+              background: "var(--accent)", transition: "width .2s",
               position: "absolute", top: 0,
             }} />
-            {/* Ícone hamburguer estilo moderno */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
               <div style={{ width: 18, height: 2, borderRadius: 99, background: "currentColor" }} />
               <div style={{ width: 12, height: 2, borderRadius: 99, background: "currentColor" }} />
@@ -314,9 +354,13 @@ export default function App() {
     );
   }
 
-  // ── DESKTOP ───────────────────────────────────────────────────────────────
+  // ── DESKTOP ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
+
+      {showWelcome && <Welcome onStartTour={handleStartTour} onSkip={() => setShowWelcome(false)} />}
+      {showTour && !showWelcome && <Tour onNavigate={navigate} onEnd={handleTourEnd} />}
+
       {/* Sidebar */}
       <aside style={{
         width: 220, background: "var(--sidebar)", display: "flex",
@@ -329,7 +373,7 @@ export default function App() {
           <div style={{ fontSize: 10, color: "var(--sid-muted)", marginTop: 2, letterSpacing: ".08em", textTransform: "uppercase" }}>by KRA</div>
         </div>
 
-        {/* Nav grouped */}
+        {/* Nav */}
         <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
           {groupedNav.map(({ gid, label, items }) => (
             <div key={gid}>
@@ -337,7 +381,7 @@ export default function App() {
               {items.map(n => {
                 const active = page === n.id;
                 return (
-                  <button key={n.id} onClick={() => setPage(n.id)} style={{
+                  <button key={n.id} id={`nav-${n.id}`} onClick={() => setPage(n.id)} style={{
                     display: "flex", alignItems: "center", gap: 9,
                     padding: "8px 10px", borderRadius: 7, border: "none",
                     cursor: "pointer", fontWeight: active ? 600 : 400,
@@ -354,7 +398,13 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Theme */}
+        {/* Ajuda — logo abaixo da nav, antes do tema */}
+        <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", paddingTop: 10, marginTop: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--sid-muted)", textTransform: "uppercase", letterSpacing: ".1em", paddingLeft: 10, marginBottom: 6 }}>Ajuda</div>
+          <HelpButtons />
+        </div>
+
+        {/* Tema */}
         <div style={{ padding: "12px 0 10px", borderTop: "1px solid rgba(255,255,255,.07)" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "var(--sid-muted)", textTransform: "uppercase", letterSpacing: ".1em", paddingLeft: 10, marginBottom: 8 }}>Tema</div>
           <div style={{ display: "flex", gap: 6, paddingLeft: 10 }}>
@@ -362,7 +412,7 @@ export default function App() {
               <button key={t.id} onClick={() => setTheme(t.id)} style={{
                 width: 20, height: 20, borderRadius: 5, background: t.color,
                 border: theme === t.id ? "2px solid #fff" : "2px solid transparent",
-                cursor: "pointer", transition: "border .12s",
+                cursor: "pointer",
               }} />
             ))}
           </div>
@@ -373,7 +423,7 @@ export default function App() {
           <button onClick={() => setShowPerfil(true)} style={{
             display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
             borderRadius: 7, border: "none", background: "rgba(255,255,255,.05)",
-            cursor: "pointer", width: "100%", textAlign: "left", transition: "background .12s",
+            cursor: "pointer", width: "100%", textAlign: "left",
           }}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.1)"}
             onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.05)"}
@@ -392,20 +442,22 @@ export default function App() {
           <button onClick={() => supabase.auth.signOut()} style={{
             padding: "7px 10px", borderRadius: 7, border: "none",
             background: "rgba(220,38,38,.1)", color: "#fca5a5",
-            cursor: "pointer", fontWeight: 500, fontSize: 12, textAlign: "left", transition: "background .12s",
+            cursor: "pointer", fontWeight: 500, fontSize: 12, textAlign: "left",
           }}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(220,38,38,.2)"}
             onMouseLeave={e => e.currentTarget.style.background = "rgba(220,38,38,.1)"}
-          >
-            Sair
-          </button>
+          >Sair</button>
         </div>
       </aside>
 
       {/* Main */}
       <main style={{ marginLeft: 220, flex: 1, padding: "32px 36px", minHeight: "100vh" }}>
         <div style={{ maxWidth: 980, width: "100%" }}>
-          <PageComponent userId={session.user.id} />
+          <PageComponent
+            userId={session.user.id}
+            onNavigate={navigate}
+            onStartTour={handleStartTourManual}
+          />
         </div>
       </main>
 
