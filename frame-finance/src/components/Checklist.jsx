@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
-import { getChecklist, markChecklistItem, resetChecklist, DEFAULT_CHECKLIST } from "../lib/onboarding";
+import { useState } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
+import { getChecklist, markChecklistItem, resetChecklist } from "../lib/onboarding";
 
 export default function Checklist({ onNavigate, onStartTour }) {
+  const isMobile = useIsMobile();
   const [items, setItems]       = useState(getChecklist);
-  const [expanded, setExpanded] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
 
-  const done  = items.filter(i => i.done).length;
-  const total = items.length;
-  const pct   = Math.round((done / total) * 100);
+  const done    = items.filter(i => i.done).length;
+  const total   = items.length;
+  const pct     = Math.round((done / total) * 100);
   const allDone = done === total;
 
   const handleItem = (item) => {
@@ -34,7 +35,7 @@ export default function Checklist({ onNavigate, onStartTour }) {
         <span style={{ fontSize: 18 }}>✅</span>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Primeiros passos</div>
-          <div style={{ fontSize: 11, color: "var(--muted)" }}>{done}/{total} concluídos</div>
+          <div style={{ fontSize: 11, color: "var(--muted)" }}>{done} de {total} feitos</div>
         </div>
         <div style={{ width: 60, height: 5, background: "var(--border)", borderRadius: 99 }}>
           <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent)", borderRadius: 99 }} />
@@ -60,10 +61,12 @@ export default function Checklist({ onNavigate, onStartTour }) {
           <span style={{ fontSize: 20 }}>{allDone ? "🎉" : "🗺️"}</span>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>
-              {allDone ? "Parabéns! Você completou tudo!" : "Primeiros passos"}
+              {allDone ? "Boa, você completou tudo!" : "Por onde começar"}
             </div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>
-              {allDone ? "Sua jornada financeira começa agora." : `${done} de ${total} concluídos · ${pct}%`}
+              {allDone
+                ? "Agora é só usar e deixar o app trabalhar por você."
+                : `${done} de ${total} feitos · ${pct}%`}
             </div>
           </div>
         </div>
@@ -94,13 +97,15 @@ export default function Checklist({ onNavigate, onStartTour }) {
       <div style={{ padding: "8px 0" }}>
         {items.map((item, i) => (
           <div key={item.id} style={{
-            display: "flex", alignItems: "center", gap: 12,
-            padding: "12px 20px",
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "flex-start" : "center",
+            gap: isMobile ? 8 : 12,
+            padding: isMobile ? "14px 16px" : "12px 20px",
             borderBottom: i < items.length - 1 ? "1px solid var(--border)" : "none",
-            opacity: item.done ? .6 : 1,
+            opacity: item.done ? .55 : 1,
             transition: "opacity .2s",
           }}>
-            {/* Checkbox visual */}
             <div style={{
               width: 22, height: 22, borderRadius: 7, flexShrink: 0,
               border: `2px solid ${item.done ? "var(--green)" : "var(--border)"}`,
@@ -112,7 +117,6 @@ export default function Checklist({ onNavigate, onStartTour }) {
               {item.done ? "✓" : ""}
             </div>
 
-            {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 fontSize: 13, fontWeight: 600, color: "var(--text)",
@@ -121,12 +125,14 @@ export default function Checklist({ onNavigate, onStartTour }) {
               <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{item.tip}</div>
             </div>
 
-            {/* Botão ir */}
             {!item.done && (
               <button onClick={() => handleItem(item)} style={{
-                padding: "6px 14px", borderRadius: 8, border: "none",
+                padding: isMobile ? "10px 0" : "6px 14px",
+                width: isMobile ? "100%" : "auto",
+                borderRadius: 8, border: "none",
                 background: "var(--accent)", color: "#fff",
-                fontWeight: 600, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+                fontWeight: 700, fontSize: isMobile ? 14 : 12,
+                cursor: "pointer", whiteSpace: "nowrap",
                 flexShrink: 0,
               }}>Ir →</button>
             )}
@@ -145,7 +151,7 @@ export default function Checklist({ onNavigate, onStartTour }) {
           fontSize: 12, color: "var(--accent)", fontWeight: 600,
           display: "flex", alignItems: "center", gap: 6,
         }}>
-          🗺️ Ver tour novamente
+          🗺️ Ver o tour de novo
         </button>
         {!allDone && (
           <button onClick={handleReset} style={{

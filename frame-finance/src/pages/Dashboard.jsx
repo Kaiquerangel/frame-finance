@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import HelpButton from "../components/HelpButton";
+import React, { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import Checklist from "../components/Checklist";
 import { supabase } from "../lib/supabase";
@@ -176,6 +177,61 @@ const CustomTreemapContent = ({ x, y, width, height, name, value, index }) => {
 };
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
+
+// ── Dicas rotativas do Dashboard ─────────────────────────────────────────────
+const DAILY_TIPS = [
+  { page: "orcamento",    icon: "◑", text: "Sabia que dá pra montar seu orçamento em menos de 3 minutos? O assistente faz tudo por você." },
+  { page: "compras",      icon: "◻", text: "Antes de parcelar uma compra grande, use a seção Compras pra ver o impacto na sua fatura." },
+  { page: "metas",        icon: "◎", text: "Guardar R$ 10 por dia equivale a R$ 3.650 no fim do ano. Que tal criar uma meta agora?" },
+  { page: "relatorios",   icon: "≡", text: "Você sabe em qual categoria gasta mais? Os Relatórios mostram isso em segundos." },
+  { page: "despesasfixas",icon: "📌", text: "Cadastre suas contas fixas uma vez e o app avisa quando estão vencendo. Nunca mais pague multa." },
+  { page: "cartoes",      icon: "▭", text: "Você sabia que dá pra ver o melhor dia pra fazer uma compra no cartão e ganhar mais prazo?" },
+  { page: "emprestimos",  icon: "⊕", text: "Registre seus financiamentos e veja exatamente quanto você está pagando de juros por mês." },
+  { page: "lancamentos",  icon: "↕", text: "Registrar os gastos do dia leva menos de 1 minuto e muda completamente sua noção de onde o dinheiro vai." },
+  { page: "historico",    icon: "⏱", text: "O Histórico mostra um resumo do seu ano inteiro em um lugar só. Ótimo pra planejar o próximo." },
+  { page: "receitas",     icon: "↑", text: "Marque seu salário como recorrente e você não precisa ficar relançando todo mês." },
+];
+
+function DailyTip({ onNavigate }) {
+  const [idx, setIdx] = React.useState(() => {
+    const saved = sessionStorage.getItem("ff_tip_idx");
+    return saved !== null ? parseInt(saved) : Math.floor(Math.random() * DAILY_TIPS.length);
+  });
+
+  const tip = DAILY_TIPS[idx];
+
+  const next = () => {
+    const newIdx = (idx + 1) % DAILY_TIPS.length;
+    setIdx(newIdx);
+    sessionStorage.setItem("ff_tip_idx", String(newIdx));
+  };
+
+  return (
+    <div style={{
+      background: "var(--accentbg)", border: "1px solid var(--accent)33",
+      borderRadius: 12, padding: "12px 16px", marginBottom: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+        <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{tip.icon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 3 }}>Dica do dia</div>
+          <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.55 }}>{tip.text}</div>
+        </div>
+        <button onClick={next} title="Próxima dica" style={{
+          width: 28, height: 28, borderRadius: 7, border: "1px solid var(--border)",
+          background: "var(--bg)", color: "var(--muted)", flexShrink: 0,
+          cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>→</button>
+      </div>
+      <button onClick={() => { sessionStorage.setItem("ff_help_section", tip.page); onNavigate("aprendendo"); }} style={{
+        width: "100%", padding: "9px 0", borderRadius: 8, border: "none",
+        background: "var(--accent)", color: "#fff",
+        fontWeight: 700, fontSize: 13, cursor: "pointer",
+      }}>Saiba mais</button>
+    </div>
+  );
+}
+
 export default function Dashboard({ userId, onNavigate, onStartTour }) {
   const isMobile = useIsMobile();
   const [transactions, setTransactions]   = useState([]);
@@ -311,6 +367,7 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
     <div>
       {/* Checklist de primeiros passos */}
       <Checklist onNavigate={onNavigate} onStartTour={onStartTour} />
+      <DailyTip onNavigate={onNavigate} />
       {/* Header */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
         <div>
@@ -501,6 +558,7 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
           ))
         }
       </Card>
+      <HelpButton pageId="dashboard" onNavigate={onNavigate} />
     </div>
   );
 }

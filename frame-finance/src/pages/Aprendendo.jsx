@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 
 const Card = ({ children, style = {} }) => (
@@ -398,91 +398,60 @@ const SECTIONS = [
 export default function Aprendendo({ onNavigate }) {
   const isMobile = useIsMobile();
   const [active, setActive] = useState("dashboard");
+  const [showContent, setShowContent] = useState(!isMobile);
+
+  useEffect(() => {
+    const section = sessionStorage.getItem("ff_help_section");
+    if (section) {
+      const exists = SECTIONS.find(s => s.id === section);
+      if (exists) {
+        setActive(section);
+        setShowContent(true);
+      }
+      sessionStorage.removeItem("ff_help_section");
+    }
+  }, []);
+
   const section = SECTIONS.find(s => s.id === active);
 
-  return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        {!isMobile && (
-          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>
-            Aprendendo a Usar
-          </h1>
-        )}
-        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: isMobile ? 0 : 4 }}>
-          Guia completo com exemplos práticos para você tirar o máximo do Frame Finance.
-        </p>
-      </div>
+  const handleSelect = (id) => {
+    setActive(id);
+    setShowContent(true);
+  };
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "220px 1fr", gap: 16, alignItems: "start" }}>
+  // ── MOBILE ────────────────────────────────────────────────────────────────
+  if (isMobile) {
+    // Tela de conteúdo de uma seção específica
+    if (showContent && section) {
+      return (
+        <div>
+          {/* Botão voltar */}
+          <button onClick={() => setShowContent(false)} style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: "var(--bg)", border: "1px solid var(--border)",
+            borderRadius: 10, padding: "9px 14px", cursor: "pointer",
+            color: "var(--text)", fontSize: 13, fontWeight: 600,
+            marginBottom: 16,
+          }}>
+            ← Voltar
+          </button>
 
-        {/* Menu lateral de seções */}
-        <div style={{
-          background: "var(--surface)", borderRadius: 14,
-          border: "1px solid var(--border)", padding: 8,
-          position: isMobile ? "static" : "sticky", top: 24,
-        }}>
-          {isMobile && (
-            <div style={{ padding: "6px 8px 10px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".08em" }}>
-              Selecione uma seção
-            </div>
-          )}
-          {/* Mobile: scroll horizontal */}
-          {isMobile ? (
-            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
-              {SECTIONS.map(s => (
-                <button key={s.id} onClick={() => setActive(s.id)} style={{
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                  padding: "8px 12px", borderRadius: 10, border: "none", cursor: "pointer",
-                  background: active === s.id ? "var(--accentbg)" : "transparent",
-                  color: active === s.id ? "var(--accent)" : "var(--muted)",
-                  fontWeight: active === s.id ? 700 : 400, fontSize: 11,
-                  whiteSpace: "nowrap", flexShrink: 0,
-                  outline: active === s.id ? `2px solid ${s.color}44` : "none",
-                }}>
-                  <span style={{ fontSize: 18 }}>{s.icon}</span>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            /* Desktop: lista vertical */
-            SECTIONS.map(s => (
-              <button key={s.id} onClick={() => setActive(s.id)} style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%",
-                padding: "9px 12px", borderRadius: 9, border: "none", cursor: "pointer",
-                background: active === s.id ? "var(--accentbg)" : "transparent",
-                color: active === s.id ? "var(--accent)" : "var(--text)",
-                fontWeight: active === s.id ? 700 : 400, fontSize: 13,
-                textAlign: "left", transition: "all .12s",
-                borderLeft: active === s.id ? `3px solid ${s.color}` : "3px solid transparent",
-              }}>
-                <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>{s.icon}</span>
-                {s.label}
-              </button>
-            ))
-          )}
-        </div>
-
-        {/* Conteúdo da seção */}
-        {section && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-
-            {/* Hero da seção */}
-            <Card style={{ borderLeft: `4px solid ${section.color}`, padding: "20px 24px" }}>
+            {/* Hero */}
+            <Card style={{ borderLeft: `4px solid ${section.color}`, padding: "18px 20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
                 <div style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
                   background: `${section.color}18`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 22,
+                  fontSize: 20,
                 }}>{section.icon}</div>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: 18, color: "var(--text)" }}>{section.label}</div>
-                  <div style={{ fontSize: 13, color: section.color, fontWeight: 600 }}>{section.tagline}</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: "var(--text)" }}>{section.label}</div>
+                  <div style={{ fontSize: 12, color: section.color, fontWeight: 600 }}>{section.tagline}</div>
                 </div>
               </div>
-              <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.75, margin: 0 }}>
+              <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.7, margin: 0 }}>
                 {section.what}
               </p>
             </Card>
@@ -505,7 +474,7 @@ export default function Aprendendo({ onNavigate }) {
               </div>
             </Card>
 
-            {/* Como usar passo a passo */}
+            {/* Passo a passo */}
             <Card>
               <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 14 }}>
                 Como usar, passo a passo
@@ -513,8 +482,6 @@ export default function Aprendendo({ onNavigate }) {
               {section.howTo.map((step, i) => (
                 <Step key={i} number={i + 1}>{step}</Step>
               ))}
-
-              {/* Exemplo prático */}
               <Example>{section.example}</Example>
             </Card>
 
@@ -528,7 +495,147 @@ export default function Aprendendo({ onNavigate }) {
               ))}
             </Card>
 
-            {/* Botão ir para a seção */}
+            {/* Botão ir */}
+            <button onClick={() => onNavigate(section.id)} style={{
+              width: "100%", padding: "15px 0", borderRadius: 12, border: "none",
+              background: section.color, color: "#fff",
+              fontWeight: 700, fontSize: 15, cursor: "pointer",
+              boxShadow: `0 4px 16px ${section.color}44`,
+              marginBottom: 8,
+            }}>
+              Ir para {section.label}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Tela de lista de seções no mobile
+    return (
+      <div>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
+          Escolha uma seção para ver como usar, exemplos e dicas.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {SECTIONS.map(s => (
+            <button key={s.id} onClick={() => handleSelect(s.id)} style={{
+              display: "flex", alignItems: "center", gap: 14,
+              padding: "14px 16px", borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              cursor: "pointer", textAlign: "left", width: "100%",
+            }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+                background: `${s.color}18`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 20,
+              }}>{s.icon}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{s.tagline}</div>
+              </div>
+              <span style={{ color: "var(--muted)", fontSize: 16, flexShrink: 0 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── DESKTOP ───────────────────────────────────────────────────────────────
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>
+          Aprendendo a Usar
+        </h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
+          Guia completo com exemplos práticos para você tirar o máximo do Frame Finance.
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16, alignItems: "start" }}>
+
+        {/* Menu lateral */}
+        <div style={{
+          background: "var(--surface)", borderRadius: 14,
+          border: "1px solid var(--border)", padding: 8,
+          position: "sticky", top: 24,
+        }}>
+          {SECTIONS.map(s => (
+            <button key={s.id} onClick={() => setActive(s.id)} style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
+              padding: "9px 12px", borderRadius: 9, border: "none", cursor: "pointer",
+              background: active === s.id ? "var(--accentbg)" : "transparent",
+              color: active === s.id ? "var(--accent)" : "var(--text)",
+              fontWeight: active === s.id ? 700 : 400, fontSize: 13,
+              textAlign: "left", transition: "all .12s",
+              borderLeft: active === s.id ? `3px solid ${s.color}` : "3px solid transparent",
+            }}>
+              <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>{s.icon}</span>
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Conteúdo */}
+        {section && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Card style={{ borderLeft: `4px solid ${section.color}`, padding: "20px 24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  background: `${section.color}18`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 22,
+                }}>{section.icon}</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: "var(--text)" }}>{section.label}</div>
+                  <div style={{ fontSize: 13, color: section.color, fontWeight: 600 }}>{section.tagline}</div>
+                </div>
+              </div>
+              <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.75, margin: 0 }}>
+                {section.what}
+              </p>
+            </Card>
+
+            <Card>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 12 }}>
+                Para que serve?
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {section.forWhat.map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{
+                      width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                      background: section.color, marginTop: 7,
+                    }} />
+                    <span style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 14 }}>
+                Como usar, passo a passo
+              </div>
+              {section.howTo.map((step, i) => (
+                <Step key={i} number={i + 1}>{step}</Step>
+              ))}
+              <Example>{section.example}</Example>
+            </Card>
+
+            <Card>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 4 }}>
+                Dicas importantes
+              </div>
+              {section.tips.map((tip, i) => (
+                <Tip key={i}>{tip}</Tip>
+              ))}
+            </Card>
+
             <button onClick={() => onNavigate(section.id)} style={{
               width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
               background: section.color, color: "#fff",
@@ -539,7 +646,7 @@ export default function Aprendendo({ onNavigate }) {
               onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
               onMouseLeave={e => e.currentTarget.style.opacity = "1"}
             >
-              Ir para {section.label} →
+              Ir para {section.label}
             </button>
           </div>
         )}

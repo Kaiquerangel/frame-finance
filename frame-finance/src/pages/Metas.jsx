@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -10,7 +12,7 @@ const inp = {
   color: "var(--text)", fontSize: 14, outline: "none", fontFamily: "DM Sans",
 };
 
-export default function Metas({ userId }) {
+export default function Metas({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [goals, setGoals]       = useState([]);
   const [form, setForm]         = useState({ name: "", target: "", saved: "" });
@@ -47,7 +49,12 @@ export default function Metas({ userId }) {
 
   return (
     <div>
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 28, letterSpacing: "-.02em", color: "var(--text)" }}>Metas de Economia</h1>
+      {/* Banner de ajuda para novos usuários */}
+      <EmptyBanner pageId="metas" onNavigate={onNavigate} message="Ainda não tem nenhuma meta criada. Veja como usar e comece a planejar seus objetivos." />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 28, letterSpacing: "-.02em", color: "var(--text)" }}>Metas de Economia</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "metas"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
 
       {/* Form */}
       <div style={{ background: "var(--surface)", borderRadius: 18, padding: 24, border: "1px solid var(--border)", marginBottom: 28 }}>
@@ -66,8 +73,9 @@ export default function Metas({ userId }) {
             <input type="number" value={form.saved} onChange={e => setForm(f => ({ ...f, saved: e.target.value }))} placeholder="0" style={inp} />
           </div>
           <button onClick={addGoal} disabled={loading} style={{
-            padding: "11px 24px", borderRadius: 10, border: "none", background: "var(--accent)",
-            color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "Syne",
+            padding: "12px 24px", borderRadius: 10, border: "none", background: "var(--accent)",
+            color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+            width: isMobile ? "100%" : "auto",
             whiteSpace: "nowrap", opacity: loading ? .7 : 1,
           }}>
             {loading ? "..." : "+ Criar"}
@@ -115,6 +123,7 @@ export default function Metas({ userId }) {
           })
         }
       </div>
+      <HelpButton pageId="metas" onNavigate={onNavigate} />
     </div>
   );
 }

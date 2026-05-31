@@ -1,4 +1,7 @@
 import { useState, useRef } from "react";
+import { useIsMobile } from "../lib/useIsMobile";
+import { FooterMini } from "../components/Footer";
+import Privacidade from "../components/Privacidade";
 import { supabase } from "../lib/supabase";
 
 const inp = {
@@ -16,9 +19,12 @@ const TABS = [
   { id: "info",  label: "Informações" },
   { id: "senha", label: "Senha" },
   { id: "prefs", label: "Preferências" },
+  { id: "sobre", label: "Sobre" },
 ];
 
 export default function Perfil({ userId, profile, onClose, onUpdate }) {
+  const isMobile = useIsMobile();
+  const [showPrivacidade, setShowPrivacidade] = useState(false);
   const [firstName, setFirstName]     = useState(profile?.first_name || "");
   const [lastName, setLastName]       = useState(profile?.last_name || "");
   const [nick, setNick]               = useState(profile?.nick || "");
@@ -205,6 +211,12 @@ export default function Perfil({ userId, profile, onClose, onUpdate }) {
             </div>
           )}
 
+          {activeTab === "sobre" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              <FooterMini onPrivacidade={() => setShowPrivacidade(true)} />
+            </div>
+          )}
+
           {error   && <div style={{ marginTop: 12, padding: "9px 13px", borderRadius: 8, background: "var(--redbg)", color: "var(--red)", fontSize: 13 }}>{error}</div>}
           {success && <div style={{ marginTop: 12, padding: "9px 13px", borderRadius: 8, background: "var(--greenbg)", color: "var(--green)", fontSize: 13 }}>{success}</div>}
 
@@ -223,6 +235,7 @@ export default function Perfil({ userId, profile, onClose, onUpdate }) {
           </div>
         </div>
       </div>
+    {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
     </div>
   );
 }

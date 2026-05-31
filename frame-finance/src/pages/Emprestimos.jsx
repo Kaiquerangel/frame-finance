@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -22,7 +24,7 @@ const Label = ({ children }) => (
   <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>{children}</div>
 );
 
-export default function Emprestimos({ userId }) {
+export default function Emprestimos({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [loans, setLoans]         = useState([]);
   const [installments, setInstallments] = useState([]);
@@ -115,8 +117,13 @@ export default function Emprestimos({ userId }) {
 
   return (
     <div>
+      {/* Banner de ajuda para novos usuários */}
+      <EmptyBanner pageId="emprestimos" onNavigate={onNavigate} message="Sem empréstimos registrados. Veja como controlar financiamentos e dívidas aqui." />
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Empréstimos</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Empréstimos</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "emprestimos"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Controle de empréstimos e financiamentos</p>
       </div>
 
@@ -308,6 +315,7 @@ export default function Emprestimos({ userId }) {
           </Card>
         )}
       </div>
+      <HelpButton pageId="emprestimos" onNavigate={onNavigate} />
     </div>
   );
 }

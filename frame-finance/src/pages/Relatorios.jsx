@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -30,7 +32,7 @@ const Delta = ({ value, invert = false }) => {
 
 const TABS = ["Geral","Comparativo","Juros","Dívidas","Extrato"];
 
-export default function Relatorios({ userId }) {
+export default function Relatorios({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [transactions, setTransactions] = useState([]);
   const [revenues, setRevenues]         = useState([]);
@@ -150,7 +152,10 @@ export default function Relatorios({ userId }) {
       {/* Header */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:24 }}>
         <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <h1 style={{ fontWeight:800, fontSize:22, color:"var(--text)", letterSpacing:"-.02em" }}>Relatórios</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "relatorios"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
           <p style={{ color:"var(--muted)", fontSize:13, marginTop:2 }}>Análise completa das suas finanças</p>
         </div>
         <div style={{ display:"flex", gap:8 }}>
@@ -325,7 +330,7 @@ export default function Relatorios({ userId }) {
               {/* Delta card */}
               <Card>
                 <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>
-                  Diferença — {monthLabel(compareA)} → {monthLabel(compareB)}
+                  Diferença, {monthLabel(compareA)} → {monthLabel(compareB)}
                 </div>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
                   {[
@@ -353,7 +358,7 @@ export default function Relatorios({ userId }) {
               {/* Category comparison */}
               {allCats.length > 0 && (
                 <Card>
-                  <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Gastos por categoria — comparativo</div>
+                  <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Gastos por categoria, comparativo</div>
                   <ResponsiveContainer width="100%" height={Math.max(200, allCats.length*36)}>
                     <BarChart data={allCats.map(cat=>({
                       cat, [monthLabel(compareA)]:dataA.catMap[cat]||0, [monthLabel(compareB)]:dataB.catMap[cat]||0
@@ -372,7 +377,7 @@ export default function Relatorios({ userId }) {
 
               {/* Trend over all months */}
               <Card>
-                <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Tendência geral — todos os meses</div>
+                <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Tendência geral, todos os meses</div>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -503,6 +508,7 @@ export default function Relatorios({ userId }) {
           )}
         </Card>
       )}
+      <HelpButton pageId="relatorios" onNavigate={onNavigate} />
     </div>
   );
 }

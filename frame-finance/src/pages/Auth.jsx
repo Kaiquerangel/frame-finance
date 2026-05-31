@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FooterMini } from "../components/Footer";
+import Privacidade from "../components/Privacidade";
 import { supabase } from "../lib/supabase";
 
 const inp = (extra = {}) => ({
@@ -19,6 +21,7 @@ const Msg = ({ text, type }) => (
 
 export default function Auth() {
   const [mode, setMode]           = useState("login");
+  const [showPrivacidade, setShowPrivacidade] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
   const [success, setSuccess]     = useState("");
@@ -107,6 +110,7 @@ export default function Auth() {
   };
 
   return (
+    <>
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
       background: "var(--bg)", padding: 24,
@@ -255,7 +259,27 @@ export default function Auth() {
             </button>
           </>
         )}
+        {/* Aviso de segurança */}
+        <div style={{
+          marginTop: 20, padding: "10px 14px", borderRadius: 10,
+          background: "var(--bg)", border: "1px solid var(--border)",
+          display: "flex", alignItems: "flex-start", gap: 8,
+        }}>
+          <span style={{ fontSize: 15, flexShrink: 0 }}>🔒</span>
+          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+            O Frame Finance nunca pede dados do seu cartão de crédito, senha de banco ou acesso a contas financeiras.{" "}
+            <button onClick={() => setShowPrivacidade(true)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 12, color: "var(--accent)", fontWeight: 600, padding: 0,
+            }}>Saiba mais</button>
+          </div>
+        </div>
+
+        <FooterMini onPrivacidade={() => setShowPrivacidade(true)} />
       </div>
     </div>
+
+    {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
+    </>
   );
 }

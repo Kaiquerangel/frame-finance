@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -10,7 +12,7 @@ const inp = {
   color: "var(--text)", fontSize: 14, outline: "none", fontFamily: "DM Sans",
 };
 
-export default function Categorias({ userId }) {
+export default function Categorias({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [custom, setCustom]   = useState([]);
   const [form, setForm]       = useState({ type: "despesa", name: "" });
@@ -45,7 +47,10 @@ export default function Categorias({ userId }) {
 
   return (
     <div>
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 28, letterSpacing: "-.02em", color: "var(--text)" }}>Categorias</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 28, letterSpacing: "-.02em", color: "var(--text)" }}>Categorias</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "categorias"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
 
       {/* Form */}
       <div style={{ background: "var(--surface)", borderRadius: 18, padding: 24, border: "1px solid var(--border)", marginBottom: 28 }}>
@@ -105,6 +110,7 @@ export default function Categorias({ userId }) {
           </div>
         ))}
       </div>
+      <HelpButton pageId="categorias" onNavigate={onNavigate} />
     </div>
   );
 }

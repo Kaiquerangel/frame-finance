@@ -1,9 +1,9 @@
-// ── Chaves do localStorage ────────────────────────────────────────────────────
+// Chaves do localStorage
 export const KEYS = {
-  welcomed:    "ff_welcomed",       // boolean — viu a tela de boas-vindas
-  tourDone:    "ff_tour_done",      // boolean — concluiu o tour ao menos 1x
-  tourRepeat:  "ff_tour_repeat",    // boolean — quer ver o tour novamente
-  checklist:   "ff_checklist",      // JSON    — estado da checklist
+  welcomed:   "ff_welcomed",
+  tourDone:   "ff_tour_done",
+  tourRepeat: "ff_tour_repeat",
+  checklist:  "ff_checklist",
 };
 
 export const getWelcomed  = () => localStorage.getItem(KEYS.welcomed) === "true";
@@ -12,7 +12,7 @@ export const setWelcomed  = () => localStorage.setItem(KEYS.welcomed, "true");
 export const getTourDone   = () => localStorage.getItem(KEYS.tourDone) === "true";
 export const setTourDone   = () => localStorage.setItem(KEYS.tourDone, "true");
 
-export const getTourRepeat = () => localStorage.getItem(KEYS.tourRepeat) !== "false"; // default: true
+export const getTourRepeat = () => localStorage.getItem(KEYS.tourRepeat) !== "false";
 export const setTourRepeat = (v) => localStorage.setItem(KEYS.tourRepeat, String(v));
 
 export const resetTour = () => {
@@ -20,15 +20,15 @@ export const resetTour = () => {
   localStorage.setItem(KEYS.tourRepeat, "true");
 };
 
-// ── Checklist ────────────────────────────────────────────────────────────────
+// Checklist
 export const DEFAULT_CHECKLIST = [
-  { id: "receita",      label: "Adicione sua primeira receita",         page: "receitas",     icon: "↑", tip: "Registre seu salário ou qualquer entrada de dinheiro." },
-  { id: "lancamento",   label: "Registre um gasto do dia a dia",        page: "lancamentos",  icon: "↓", tip: "Mercado, farmácia, restaurante — tudo conta!" },
-  { id: "cartao",       label: "Cadastre um cartão de crédito",         page: "cartoes",      icon: "▭", tip: "Gerencie seus cartões e acompanhe faturas." },
-  { id: "orcamento",    label: "Monte seu orçamento com o assistente",  page: "orcamento",    icon: "◑", tip: "Use a regra 50-30-20 para organizar sua renda." },
-  { id: "meta",         label: "Crie uma meta de economia",             page: "metas",        icon: "◎", tip: "Defina um objetivo e acompanhe seu progresso." },
-  { id: "despesafixa",  label: "Adicione uma despesa fixa",             page: "despesasfixas",icon: "📌", tip: "Aluguel, internet, academia — gastos que se repetem." },
-  { id: "emprestimo",   label: "Registre um empréstimo ou financiamento", page: "emprestimos",icon: "⊕", tip: "Acompanhe parcelas e juros dos seus compromissos." },
+  { id: "receita",     label: "Adicione sua primeira receita",           page: "receitas",      icon: "up",  tip: "Coloca seu salário ou qualquer dinheiro que entrou." },
+  { id: "lancamento",  label: "Registre um gasto do dia a dia",          page: "lancamentos",   icon: "down", tip: "Mercado, farmácia, restaurante, tudo conta." },
+  { id: "cartao",      label: "Cadastre um cartão de crédito",           page: "cartoes",       icon: "card", tip: "Acompanhe o limite e a fatura de cada cartão." },
+  { id: "orcamento",   label: "Monte seu orçamento com o assistente",    page: "orcamento",     icon: "plan", tip: "Leva menos de 3 minutos e organiza sua renda direitinho." },
+  { id: "meta",        label: "Crie uma meta de economia",               page: "metas",         icon: "goal", tip: "Coloca um objetivo com valor e acompanha o progresso." },
+  { id: "despesafixa", label: "Adicione uma despesa fixa",               page: "despesasfixas", icon: "pin",  tip: "Aluguel, internet, academia, contas que chegam todo mês." },
+  { id: "emprestimo",  label: "Registre um empréstimo ou financiamento", page: "emprestimos",   icon: "loan", tip: "Veja parcelas, juros e quanto ainda falta pagar." },
 ];
 
 export const getChecklist = () => {
@@ -48,125 +48,118 @@ export const markChecklistItem = (id) => {
 
 export const resetChecklist = () => localStorage.removeItem(KEYS.checklist);
 
-// ── Passos do Tour ────────────────────────────────────────────────────────────
-// target: ID do elemento HTML que será destacado
-// page: página para navegar antes de mostrar o passo
+// Passos do Tour
 export const TOUR_STEPS = [
-  // ── Geral ──────────────────────────────────────────────────────────────────
   {
     id: "welcome",
     page: "dashboard",
-    target: null, // sem highlight — cobre a tela toda
-    title: "Bem-vindo ao Frame Finance! 👋",
-    desc: "Este tour vai te mostrar tudo que o app pode fazer por você. São 12 seções, cada uma com um propósito. Vamos começar pelo Dashboard!",
+    target: null,
+    title: "Bem-vindo ao Frame Finance!",
+    desc: "Vou te mostrar tudo que tem aqui dentro. São 12 seções e cada uma tem um papel diferente nas suas finanças. Vai levar poucos minutos e depois você vai saber exatamente onde cada coisa está.",
     position: "center",
   },
   {
     id: "dashboard",
     page: "dashboard",
     target: "nav-dashboard",
-    title: "Dashboard 📊",
-    desc: "Aqui é o seu painel de controle. Você vê um resumo completo: saldo do mês, receitas, despesas, saúde financeira, gráficos e alertas. É a primeira coisa que você vê ao abrir o app.",
+    title: "Dashboard",
+    desc: "Aqui é a tela principal. Toda vez que você abrir o app, vai cair aqui primeiro. Tem um resumo de tudo: quanto entrou, quanto saiu, gráficos dos últimos meses, alertas de contas vencendo e o seu Score de Saúde Financeira.",
     position: "right",
   },
   {
     id: "receitas",
     page: "receitas",
     target: "nav-receitas",
-    title: "Receitas ↑",
-    desc: "Registre tudo que entra: salário, freelances, aluguéis recebidos, dividendos. Você pode marcar receitas como recorrentes para não esquecer de lançar todo mês.",
+    title: "Receitas",
+    desc: "Tudo que entra no seu bolso vai aqui. Salário, freela, aluguel recebido, qualquer coisa. Você pode marcar uma receita como recorrente e ela não precisa ser lançada todo mês manualmente.",
     position: "right",
   },
   {
     id: "lancamentos",
     page: "lancamentos",
     target: "nav-lancamentos",
-    title: "Lançamentos ↕",
-    desc: "Os gastos do dia a dia ficam aqui — mercado, farmácia, restaurante, Uber. Você pode filtrar por mês, categoria ou tipo, e editar qualquer lançamento.",
+    title: "Lançamentos",
+    desc: "Os gastos do dia a dia ficam aqui. Mercado, farmácia, Uber, almoço fora. Você filtra por mês, por categoria, busca pelo nome e edita qualquer lançamento se errar alguma coisa.",
     position: "right",
   },
   {
     id: "despesasfixas",
     page: "despesasfixas",
     target: "nav-despesasfixas",
-    title: "Despesas Fixas 📌",
-    desc: "Gastos que se repetem todo mês: aluguel, internet, academia, streaming. O app gera automaticamente os pagamentos mensais e avisa quando estão vencendo.",
+    title: "Despesas Fixas",
+    desc: "Contas que chegam todo mês ficam aqui. Aluguel, internet, academia, streaming. Você cadastra uma vez e o app já gera o registro de cada mês automaticamente, avisando quando está perto de vencer.",
     position: "right",
   },
   {
     id: "compras",
     page: "compras",
     target: "nav-compras",
-    title: "Compras ◻",
-    desc: "Registre compras parceladas no cartão. O app calcula automaticamente cada parcela usando a Tabela Price e te sugere o melhor dia para comprar.",
+    title: "Compras",
+    desc: "Comprou algo parcelado no cartão? Registra aqui. Coloca o valor total, o número de parcelas e o cartão. O app divide tudo e já joga cada parcela no mês certo automaticamente.",
     position: "right",
   },
-  // ── Crédito ────────────────────────────────────────────────────────────────
   {
     id: "cartoes",
     page: "cartoes",
     target: "nav-cartoes",
-    title: "Cartões ▭",
-    desc: "Gerencie seus cartões de crédito. Veja o limite utilizado, acompanhe a fatura mês a mês e marque parcelas como pagas. Toque em um cartão para ver os detalhes.",
+    title: "Cartões",
+    desc: "Cadastre seus cartões e veja a fatura de cada mês. Dá pra acompanhar o limite utilizado, marcar parcelas como pagas e receber aviso quando a fatura está fechando.",
     position: "right",
   },
   {
     id: "emprestimos",
     page: "emprestimos",
     target: "nav-emprestimos",
-    title: "Empréstimos ⊕",
-    desc: "Controle financiamentos e empréstimos. O app calcula os juros de cada parcela pelo sistema SAC e mostra quanto você já pagou e quanto ainda deve.",
+    title: "Empréstimos",
+    desc: "Tem financiamento de carro, moto ou um empréstimo pessoal? Registra aqui. O app mostra quanto de cada parcela é juros, quanto você já pagou e quando vai quitar.",
     position: "right",
   },
-  // ── Planejamento ───────────────────────────────────────────────────────────
   {
     id: "orcamento",
     page: "orcamento",
     target: "nav-orcamento",
-    title: "Orçamento ◑",
-    desc: "Defina um limite de gastos por categoria. Use o assistente inteligente — ele aplica a Regra 50-30-20 e distribui sua renda automaticamente entre necessidades, desejos e economia.",
+    title: "Orçamento",
+    desc: "Define quanto pode gastar em cada área da sua vida. Tem um assistente que monta tudo por você usando a Regra 50-30-20. Você informa a renda e ele distribui automaticamente entre necessidades, desejos e economia.",
     position: "right",
   },
   {
     id: "metas",
     page: "metas",
     target: "nav-metas",
-    title: "Metas ◎",
-    desc: "Defina objetivos financeiros: viagem, carro, reserva de emergência. Acompanhe o progresso com um visual claro e receba alertas quando estiver perto de concluir.",
+    title: "Metas",
+    desc: "Crie objetivos financeiros com nome e valor. Viagem, carro, reserva de emergência, o que for. Conforme você vai guardando dinheiro, atualiza o valor e vê o progresso no anel visual.",
     position: "right",
   },
   {
     id: "relatorios",
     page: "relatorios",
     target: "nav-relatorios",
-    title: "Relatórios ≡",
-    desc: "Análises detalhadas das suas finanças: comparativo mês a mês, quanto você paga em juros, evolução das dívidas e extrato completo com exportação para CSV.",
+    title: "Relatórios",
+    desc: "Com os dados que você foi lançando, o app gera gráficos e análises completas. Comparativo mês a mês, quanto você pagou de juros, como estão suas dívidas e um extrato que você pode exportar em planilha.",
     position: "right",
   },
   {
     id: "historico",
     page: "historico",
     target: "nav-historico",
-    title: "Histórico ⏱",
-    desc: "Veja tudo em ordem cronológica: extrato unificado, faturas de cartões, metas concluídas e resumo anual. É a memória completa das suas finanças.",
+    title: "Histórico",
+    desc: "Aqui fica o arquivo completo das suas finanças. Extrato de tudo junto, faturas de meses passados, metas que você já concluiu e um resumo do ano inteiro. Muito útil quando você precisa consultar algo de meses atrás.",
     position: "right",
   },
-  // ── Config ─────────────────────────────────────────────────────────────────
   {
     id: "categorias",
     page: "categorias",
     target: "nav-categorias",
-    title: "Categorias ⊞",
-    desc: "Personalize as categorias de receitas e despesas. As categorias padrão já cobrem a maioria dos casos, mas você pode criar quantas quiser.",
+    title: "Categorias",
+    desc: "O app já vem com as categorias mais comuns, mas você pode criar as suas. Quanto melhor você categorizar os gastos, mais úteis ficam os relatórios no fim do mês.",
     position: "right",
   },
-  // ── Fim ───────────────────────────────────────────────────────────────────
   {
     id: "fim",
     page: "dashboard",
     target: null,
-    title: "Você está pronto! 🎉",
-    desc: "Agora você conhece todas as funcionalidades do Frame Finance. Comece adicionando sua renda e seus gastos — quanto mais dados, mais preciso fica o seu painel.",
+    title: "Pronto, você conhece tudo!",
+    desc: "Agora é só começar. Lança sua renda, registra os gastos e deixa o app trabalhar por você. Quanto mais você usar, mais claro fica pra onde o seu dinheiro está indo.",
     position: "center",
     isFinal: true,
   },

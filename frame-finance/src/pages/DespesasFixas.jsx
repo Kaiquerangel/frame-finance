@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -72,7 +74,7 @@ async function ensurePayments(userId, expenses) {
   }
 }
 
-export default function DespesasFixas({ userId }) {
+export default function DespesasFixas({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [expenses, setExpenses]   = useState([]);
   const [payments, setPayments]   = useState([]);
@@ -172,8 +174,13 @@ export default function DespesasFixas({ userId }) {
 
   return (
     <div>
+      {/* Banner de ajuda para novos usuários */}
+      <EmptyBanner pageId="despesasfixas" onNavigate={onNavigate} message="Sem despesas fixas cadastradas. Veja como funciona e cadastre seu aluguel, internet e outras contas fixas." />
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Despesas Fixas</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Despesas Fixas</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "despesasfixas"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Cadastre uma vez, acompanhe todo mês</p>
       </div>
 
@@ -302,6 +309,7 @@ export default function DespesasFixas({ userId }) {
           }
         </Card>
       </div>
+      <HelpButton pageId="despesasfixas" onNavigate={onNavigate} />
     </div>
   );
 }

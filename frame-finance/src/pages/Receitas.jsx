@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -21,7 +23,7 @@ const Card = ({ children, style = {} }) => (
   </div>
 );
 
-export default function Receitas({ userId }) {
+export default function Receitas({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [revenues, setRevenues] = useState([]);
   const [filterMonth, setFilterMonth] = useState(today().slice(0, 7));
@@ -76,8 +78,13 @@ export default function Receitas({ userId }) {
 
   return (
     <div>
+      {/* Banner de ajuda para novos usuários */}
+      <EmptyBanner pageId="receitas" onNavigate={onNavigate} message="Nenhuma receita registrada ainda. Veja como funciona e registre seu primeiro salário ou entrada." />
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Receitas</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Receitas</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "receitas"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Acompanhe todas as suas entradas</p>
       </div>
 
@@ -165,8 +172,11 @@ export default function Receitas({ userId }) {
             Receita recorrente (mensal)
           </label>
           <button onClick={add} disabled={loading} style={{
-            padding: "9px 22px", borderRadius: 8, border: "none", background: "var(--accent)",
-            color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: loading ? .7 : 1,
+            padding: isMobile ? "13px 22px" : "9px 22px",
+            borderRadius: 8, border: "none", background: "var(--accent)",
+            color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+            opacity: loading ? .7 : 1,
+            width: isMobile ? "100%" : "auto",
           }}>
             {loading ? "Salvando..." : "+ Adicionar"}
           </button>
@@ -205,6 +215,7 @@ export default function Receitas({ userId }) {
           ))
         }
       </Card>
+      <HelpButton pageId="receitas" onNavigate={onNavigate} />
     </div>
   );
 }

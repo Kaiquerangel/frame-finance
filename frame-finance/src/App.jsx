@@ -21,6 +21,8 @@ import Perfil        from "./pages/Perfil";
 import Historico     from "./pages/Historico";
 import Aprendendo    from "./pages/Aprendendo";
 import Welcome       from "./components/Welcome";
+import Footer, { FooterMini } from "./components/Footer";
+import Privacidade   from "./components/Privacidade";
 import Tour          from "./components/Tour";
 
 const THEMES = [
@@ -63,7 +65,8 @@ export default function App() {
   const [showPerfil, setShowPerfil]   = useState(false);
   const [showMore, setShowMore]       = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showTour, setShowTour]       = useState(false);
+  const [showTour, setShowTour]         = useState(false);
+  const [showPrivacidade, setShowPrivacidade] = useState(false);
   const isMobile                      = useIsMobile();
   const moreRef                       = useRef(null);
 
@@ -155,7 +158,7 @@ export default function App() {
   }));
   const morePages = NAV.filter(n => !BOTTOM_NAV.includes(n.id));
 
-  // Botões de ajuda — aparecem próximos em ambos os layouts
+  // Botões de ajuda, aparecem próximos em ambos os layouts
   const HelpButtons = ({ inSheet = false }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: inSheet ? "0 20px" : "8px 0" }}>
       <button onClick={() => { navigate("aprendendo"); }} style={{
@@ -350,6 +353,7 @@ export default function App() {
         {showPerfil && (
           <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
         )}
+        {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
       </div>
     );
   }
@@ -398,7 +402,7 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Ajuda — logo abaixo da nav, antes do tema */}
+        {/* Ajuda, logo abaixo da nav, antes do tema */}
         <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", paddingTop: 10, marginTop: 8 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "var(--sid-muted)", textTransform: "uppercase", letterSpacing: ".1em", paddingLeft: 10, marginBottom: 6 }}>Ajuda</div>
           <HelpButtons />
@@ -458,12 +462,14 @@ export default function App() {
             onNavigate={navigate}
             onStartTour={handleStartTourManual}
           />
+          <Footer onPrivacidade={() => setShowPrivacidade(true)} />
         </div>
       </main>
 
       {showPerfil && (
         <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
       )}
+      {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
     </div>
   );
 }

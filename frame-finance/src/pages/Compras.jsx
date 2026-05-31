@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -80,7 +82,7 @@ function bestDayToBuy(card) {
   return { bestDay, closingDay, dueDay: card.due_day };
 }
 
-export default function Compras({ userId }) {
+export default function Compras({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [purchases, setPurchases]       = useState([]);
   const [installments, setInstallments] = useState([]);
@@ -211,9 +213,14 @@ export default function Compras({ userId }) {
 
   return (
     <div>
+      {/* Banner de ajuda para novos usuários */}
+      <EmptyBanner pageId="compras" onNavigate={onNavigate} message="Nenhuma compra parcelada registrada. Veja como funciona e registre suas parcelas do cartão." />
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Compras</h1>
-        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Compras no crédito parceladas — iPhone 12x, geladeira 10x</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Compras</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "compras"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Compras no crédito parceladas, iPhone 12x, geladeira 10x</p>
       </div>
 
       {/* Form */}
@@ -291,7 +298,7 @@ export default function Compras({ userId }) {
         {/* Best day suggestion */}
         {bestDay && (
           <div style={{ background: "var(--greenbg)", borderRadius: 8, padding: "9px 14px", marginBottom: 10, fontSize: 12, color: "var(--green)" }}>
-            💡 <strong>Melhor dia para comprar:</strong> dia {bestDay.bestDay} — você terá mais tempo até o fechamento (dia {bestDay.closingDay}) e vencimento (dia {bestDay.dueDay})
+            💡 <strong>Melhor dia para comprar:</strong> dia {bestDay.bestDay}, você terá mais tempo até o fechamento (dia {bestDay.closingDay}) e vencimento (dia {bestDay.dueDay})
           </div>
         )}
 
@@ -446,6 +453,7 @@ export default function Compras({ userId }) {
           </Card>
         </div>
       )}
+      <HelpButton pageId="compras" onNavigate={onNavigate} />
     </div>
   );
 }

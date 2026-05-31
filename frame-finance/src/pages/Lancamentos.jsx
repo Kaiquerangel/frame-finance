@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { loadCategories } from "../lib/categories";
@@ -24,7 +26,7 @@ const Label = ({ children }) => (
   <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>{children}</div>
 );
 
-export default function Lancamentos({ userId }) {
+export default function Lancamentos({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories]     = useState({ receita: [], despesa: [] });
@@ -105,9 +107,14 @@ export default function Lancamentos({ userId }) {
 
   return (
     <div>
+      {/* Banner de ajuda para novos usuários */}
+      <EmptyBanner pageId="lancamentos" onNavigate={onNavigate} message="Nenhum lançamento ainda. Veja como registrar seus gastos do dia a dia." />
       <div style={{ marginBottom: 16 }}>
-        {!isMobile && <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Lançamentos</h1>}
-        {!isMobile && <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Gastos avulsos do dia a dia — mercado, farmácia, restaurante</p>}
+        {!isMobile && <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Lançamentos</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "lancamentos"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>}
+        {!isMobile && <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Gastos avulsos do dia a dia, mercado, farmácia, restaurante</p>}
       </div>
 
       {/* KPIs */}
@@ -141,7 +148,7 @@ export default function Lancamentos({ userId }) {
           ))}
         </div>
 
-        {/* Campos — stack no mobile, grid no desktop */}
+        {/* Campos, stack no mobile, grid no desktop */}
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div><Label>Descrição</Label><input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Mercado, Farmácia..." style={inp} /></div>
@@ -252,6 +259,7 @@ export default function Lancamentos({ userId }) {
           </div>
         )}
       </Card>
+      <HelpButton pageId="lancamentos" onNavigate={onNavigate} />
     </div>
   );
 }

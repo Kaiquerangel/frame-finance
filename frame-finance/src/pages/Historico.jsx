@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
@@ -20,7 +22,7 @@ const inp = {
 
 const TABS = ["Extrato Unificado", "Faturas", "Metas Concluídas", "Resumo Anual"];
 
-export default function Historico({ userId }) {
+export default function Historico({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [tab, setTab]                   = useState("Extrato Unificado");
   const [transactions, setTransactions] = useState([]);
@@ -146,7 +148,10 @@ export default function Historico({ userId }) {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Histórico</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Histórico</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "historico"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Todo o seu histórico financeiro em um lugar só</p>
       </div>
 
@@ -388,7 +393,7 @@ export default function Historico({ userId }) {
           )}
 
           <Card>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Mês a mês — {filterYear}</div>
+            <div style={{ fontWeight:700, fontSize:14, marginBottom:16, color:"var(--text)" }}>Mês a mês, {filterYear}</div>
             {annualData.map((d, i) => {
               const maxVal = Math.max(...annualData.map(x => Math.max(x.rec, x.dep)), 1);
               const recPct = (d.rec/maxVal)*100;
@@ -419,6 +424,7 @@ export default function Historico({ userId }) {
           </Card>
         </div>
       )}
+      <HelpButton pageId="historico" onNavigate={onNavigate} />
     </div>
   );
 }

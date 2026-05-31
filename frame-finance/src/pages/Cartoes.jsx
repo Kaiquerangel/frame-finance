@@ -1,3 +1,5 @@
+import HelpButton from "../components/HelpButton";
+import Privacidade from "../components/Privacidade";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { useIsMobile } from "../lib/useIsMobile";
@@ -20,8 +22,9 @@ const Card = ({ children, style = {} }) => (
   </div>
 );
 
-export default function Cartoes({ userId }) {
+export default function Cartoes({ userId, onNavigate }) {
   const isMobile = useIsMobile();
+  const [showPrivacidade, setShowPrivacidade] = useState(false);
   const [cards, setCards]               = useState([]);
   const [installments, setInstallments] = useState([]);
   const [selected, setSelected]         = useState(null);
@@ -133,7 +136,10 @@ export default function Cartoes({ userId }) {
         </div>
       ) : !isMobile ? (
         <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Cartões</h1>
+          <button onClick={() => { sessionStorage.setItem("ff_help_section", "cartoes"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
+        </div>
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Gerencie seus cartões e faturas</p>
         </div>
       ) : null}
@@ -188,6 +194,23 @@ export default function Cartoes({ userId }) {
                 }}>
                   {loading ? "Salvando..." : "+ Adicionar cartão"}
                 </button>
+
+                {/* Aviso de segurança */}
+                <div style={{
+                  marginTop: 10, padding: "10px 12px", borderRadius: 10,
+                  background: "var(--bg)", border: "1px solid var(--border)",
+                  display: "flex", alignItems: "flex-start", gap: 8,
+                }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>🔒</span>
+                  <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                    Aqui você cadastra apenas o nome e o limite do cartão para organizar as faturas.
+                    O Frame Finance nunca pede número do cartão, CVV ou senha.{" "}
+                    <button onClick={() => setShowPrivacidade(true)} style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      fontSize: 12, color: "var(--accent)", fontWeight: 600, padding: 0,
+                    }}>Entenda como funciona</button>
+                  </div>
+                </div>
               </div>
             </Card>
 
@@ -253,7 +276,7 @@ export default function Cartoes({ userId }) {
             <Card style={{ marginBottom: 16 }}>
               {!isMobile && (
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: "var(--text)" }}>
-                  Fatura — {selected.name}
+                  Fatura, {selected.name}
                 </div>
               )}
 
@@ -334,7 +357,7 @@ export default function Cartoes({ userId }) {
         )}
       </div>
 
-      {/* Modal de edição — FORA do grid */}
+      {/* Modal de edição, FORA do grid */}
       {editId && (
         <div onClick={e => e.target === e.currentTarget && setEditId(null)} style={{
           position: "fixed", inset: 0, zIndex: 200,
@@ -382,6 +405,8 @@ export default function Cartoes({ userId }) {
           </div>
         </div>
       )}
+      <HelpButton pageId="cartoes" onNavigate={onNavigate} />
+      {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
     </div>
   );
 }
