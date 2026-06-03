@@ -40,9 +40,9 @@ const TECH_STACK = [
 export default function Footer({ onPrivacidade }) {
   return (
     <footer style={{
-      marginTop: 48,
+      marginTop: 40,
       borderTop: "1px solid var(--border)",
-      padding: "20px 0 24px",
+      padding: "16px 0 20px",
     }}>
       <div style={{
         display: "flex",

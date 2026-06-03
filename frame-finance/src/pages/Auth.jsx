@@ -72,7 +72,13 @@ export default function Auth() {
       setError("Preencha todos os campos."); return;
     }
     if (signupPass !== confirmPass) { setError("As senhas não coincidem."); return; }
+    if (signupPass.length < 8) { setError("A senha precisa ter pelo menos 8 caracteres."); return; }
+    if (!/[A-Z]/.test(signupPass) || !/[0-9]/.test(signupPass)) {
+      setError("Use pelo menos uma letra maiúscula e um número na senha."); return;
+    }
     if (nick.length < 3) { setError("Nick deve ter pelo menos 3 caracteres."); return; }
+    if (firstName.trim().length < 2) { setError("Nome muito curto."); return; }
+    if (lastName.trim().length < 2) { setError("Sobrenome muito curto."); return; }
     setLoading(true);
 
     const { data: existing } = await supabase
@@ -110,7 +116,6 @@ export default function Auth() {
   };
 
   return (
-    <>
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
       background: "var(--bg)", padding: 24,
@@ -137,7 +142,7 @@ export default function Auth() {
           <div>
             <div style={{ fontFamily: "Syne", fontWeight: 700, fontSize: 18, marginBottom: 6, color: "var(--text)" }}>Recuperar senha</div>
             <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 22 }}>Enviaremos um link para redefinir sua senha.</p>
-            <input type="email" placeholder="Seu e-mail" value={forgotEmail}
+            <input type="email" placeholder="Seu e-mail" value={forgotEmail} maxLength={200}
               onChange={e => setForgotEmail(e.target.value)} style={inp()}
               onKeyDown={e => e.key === "Enter" && handleForgot()} />
             {error   && <Msg text={error}   type="error" />}
@@ -201,7 +206,7 @@ export default function Auth() {
             {/* LOGIN FIELDS */}
             {mode === "login" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <input placeholder="Nick ou e-mail" value={identifier}
+                <input placeholder="Nick ou e-mail" value={identifier} maxLength={100}
                   onChange={e => setIdentifier(e.target.value)} style={inp()} />
                 <input type="password" placeholder="Senha" value={password}
                   onChange={e => setPassword(e.target.value)} style={inp()}
@@ -224,21 +229,36 @@ export default function Auth() {
             {mode === "signup" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <input placeholder="Nome" value={firstName}
+                  <input placeholder="Nome" value={firstName} maxLength={50}
                     onChange={e => setFirstName(e.target.value)} style={inp()} />
-                  <input placeholder="Sobrenome" value={lastName}
+                  <input placeholder="Sobrenome" value={lastName} maxLength={50}
                     onChange={e => setLastName(e.target.value)} style={inp()} />
                 </div>
                 <div style={{ position: "relative" }}>
                   <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 15 }}>@</span>
                   <input placeholder="seu_nick" value={nick}
-                    onChange={e => setNick(e.target.value.toLowerCase().replace(/[^a-z0-9_.\-]/g, ""))}
+                    onChange={e => setNick(e.target.value.toLowerCase().replace(/[^a-z0-9_.\-]/g, ""))} maxLength={30}
                     style={inp({ paddingLeft: 30 })} />
                 </div>
                 <input type="email" placeholder="E-mail" value={email}
                   onChange={e => setEmail(e.target.value)} style={inp()} />
-                <input type="password" placeholder="Senha" value={signupPass}
+                <input type="password" placeholder="Senha (mín. 8 chars, 1 maiúscula, 1 número)" value={signupPass}
                   onChange={e => setSignupPass(e.target.value)} style={inp()} />
+                {signupPass.length > 0 && (
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    {[
+                      { label: "8+ chars",   ok: signupPass.length >= 8 },
+                      { label: "Maiúscula",  ok: /[A-Z]/.test(signupPass) },
+                      { label: "Número",     ok: /[0-9]/.test(signupPass) },
+                    ].map(({ label, ok }) => (
+                      <span key={label} style={{
+                        fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99,
+                        background: ok ? "var(--greenbg)" : "var(--redbg)",
+                        color: ok ? "var(--green)" : "var(--red)",
+                      }}>{ok ? "✓" : "✗"} {label}</span>
+                    ))}
+                  </div>
+                )}
                 <input type="password" placeholder="Confirmar senha" value={confirmPass}
                   onChange={e => setConfirmPass(e.target.value)} style={inp()}
                   onKeyDown={e => e.key === "Enter" && handleSignup()} />
@@ -259,27 +279,7 @@ export default function Auth() {
             </button>
           </>
         )}
-        {/* Aviso de segurança */}
-        <div style={{
-          marginTop: 20, padding: "10px 14px", borderRadius: 10,
-          background: "var(--bg)", border: "1px solid var(--border)",
-          display: "flex", alignItems: "flex-start", gap: 8,
-        }}>
-          <span style={{ fontSize: 15, flexShrink: 0 }}>🔒</span>
-          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-            O Frame Finance nunca pede dados do seu cartão de crédito, senha de banco ou acesso a contas financeiras.{" "}
-            <button onClick={() => setShowPrivacidade(true)} style={{
-              background: "none", border: "none", cursor: "pointer",
-              fontSize: 12, color: "var(--accent)", fontWeight: 600, padding: 0,
-            }}>Saiba mais</button>
-          </div>
-        </div>
-
-        <FooterMini onPrivacidade={() => setShowPrivacidade(true)} />
       </div>
     </div>
-
-    {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
-    </>
   );
 }

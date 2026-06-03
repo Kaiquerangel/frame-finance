@@ -151,7 +151,7 @@ export default function Lancamentos({ userId, onNavigate }) {
         {/* Campos, stack no mobile, grid no desktop */}
         {isMobile ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div><Label>Descrição</Label><input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Mercado, Farmácia..." style={inp} /></div>
+            <div><Label>Descrição</Label><input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Mercado, Farmácia..." maxLength={150} style={inp} /></div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div><Label>Valor (R$)</Label><input type="number" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} placeholder="0,00" style={inp} /></div>
               <div><Label>Data</Label><input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={inp} /></div>

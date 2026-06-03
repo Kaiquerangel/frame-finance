@@ -455,13 +455,20 @@ export default function App() {
       </aside>
 
       {/* Main */}
-      <main style={{ marginLeft: 220, flex: 1, padding: "32px 36px", minHeight: "100vh" }}>
-        <div style={{ maxWidth: 980, width: "100%" }}>
+      <main style={{
+        marginLeft: 220, flex: 1,
+        minHeight: "100vh",
+        display: "flex", flexDirection: "column",
+        padding: "32px 36px 0",
+      }}>
+        <div style={{ maxWidth: 980, width: "100%", flex: 1 }}>
           <PageComponent
             userId={session.user.id}
             onNavigate={navigate}
             onStartTour={handleStartTourManual}
           />
+        </div>
+        <div style={{ maxWidth: 980, width: "100%" }}>
           <Footer onPrivacidade={() => setShowPrivacidade(true)} />
         </div>
       </main>

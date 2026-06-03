@@ -66,7 +66,7 @@ export default function Categorias({ userId, onNavigate }) {
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".04em" }}>Nome</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Ex: Streaming" style={inp}
+              placeholder="Ex: Streaming" maxLength={50} style={inp}
               onKeyDown={e => e.key === "Enter" && addCat()} />
           </div>
           <button onClick={addCat} disabled={loading} style={{
