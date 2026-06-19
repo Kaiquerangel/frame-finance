@@ -1,6 +1,6 @@
 import HelpButton from "../components/HelpButton";
 import EmptyBanner from "../components/EmptyBanner";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { loadCategories } from "../lib/categories";
 import { useIsMobile } from "../lib/useIsMobile";
@@ -40,16 +40,16 @@ export default function Lancamentos({ userId, onNavigate }) {
   const [editForm, setEditForm]         = useState({});
   const [form, setForm] = useState({ type: "despesa", description: "", value: "", cat: "", date: today() });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [{ data: txs }, cats] = await Promise.all([
       supabase.from("transactions").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(500),
       loadCategories(userId),
     ]);
     setTransactions(txs || []);
     setCategories(cats);
-  };
+  }, [userId]);
 
-  useEffect(() => { load(); }, [userId]);
+  useEffect(() => { load(); }, [load]);
 
   const months = useMemo(() => {
     const s = new Set(transactions.map(t => t.date.slice(0, 7)));
@@ -79,30 +79,39 @@ export default function Lancamentos({ userId, onNavigate }) {
   const add = async () => {
     if (!form.description || !form.value || !form.cat) return;
     setLoading(true);
-    await supabase.from("transactions").insert({
+    const newTx = {
       user_id: userId, type: form.type, description: form.description,
       value: parseFloat(form.value), cat: form.cat, date: form.date,
-    });
+    };
+    const { data, error } = await supabase.from("transactions").insert(newTx).select().single();
+    if (!error && data) {
+      // Atualiza localmente de imediato — sem esperar o re-fetch
+      setTransactions(prev => [data, ...prev]);
+    }
     setForm(f => ({ ...f, description: "", value: "", cat: "" }));
     setPage(1);
-    await load();
+    await load(); // re-fetch para garantir consistência
     setLoading(false);
   };
 
   const del = async (id) => {
-    await supabase.from("transactions").delete().eq("id", id);
+    // Remove localmente de imediato para UX instantânea
     setTransactions(prev => prev.filter(t => t.id !== id));
+    await supabase.from("transactions").delete().eq("id", id);
   };
 
   const startEdit = (tx) => { setEditId(tx.id); setEditForm({ ...tx }); };
 
   const saveEdit = async () => {
-    await supabase.from("transactions").update({
+    const updated = {
       description: editForm.description, value: parseFloat(editForm.value),
       cat: editForm.cat, date: editForm.date, type: editForm.type,
-    }).eq("id", editId);
+    };
+    // Atualiza localmente de imediato
+    setTransactions(prev => prev.map(t => t.id === editId ? { ...t, ...updated } : t));
     setEditId(null);
-    await load();
+    await supabase.from("transactions").update(updated).eq("id", editId);
+    await load(); // re-fetch para confirmar
   };
 
   return (
@@ -222,6 +231,7 @@ export default function Lancamentos({ userId, onNavigate }) {
                   <select value={editForm.cat} onChange={e => setEditForm(f => ({ ...f, cat: e.target.value }))} style={{ ...inp, fontSize: 12 }}>
                     {categories[editForm.type].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
+                  <input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} style={{ ...inp, fontSize: 12 }} />
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={saveEdit} style={{ flex: 1, padding: "9px 12px", borderRadius: 7, border: "none", background: "var(--accent)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>✓ Salvar</button>
                     <button onClick={() => setEditId(null)} style={{ flex: 1, padding: "9px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "transparent", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>✕</button>

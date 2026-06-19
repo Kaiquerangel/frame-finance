@@ -121,10 +121,10 @@ export default function Emprestimos({ userId, onNavigate }) {
       <EmptyBanner pageId="emprestimos" onNavigate={onNavigate} message="Sem empréstimos registrados. Veja como controlar financiamentos e dívidas aqui." />
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Empréstimos</h1>
+          <h1 style={{ fontWeight: 800, fontSize: 24, color: "var(--text)", letterSpacing: "-.03em" }}>Empréstimos</h1>
           <button onClick={() => { sessionStorage.setItem("ff_help_section", "emprestimos"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
         </div>
-        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Controle de empréstimos e financiamentos</p>
+        <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 4, lineHeight: 1.4 }}>Controle de empréstimos e financiamentos</p>
       </div>
 
       {/* KPIs */}

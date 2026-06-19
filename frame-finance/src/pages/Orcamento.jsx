@@ -371,9 +371,11 @@ export default function Orcamento({ userId, onNavigate }) {
   const enrichedBudgets = useMemo(() =>
     budgets.map(b => {
       const rule = RULE_503020.find(r => r.cat === b.category);
-      return { ...b, icon: rule?.icon || "💰", group: rule?.group || "desejo", tip: rule?.tip || "" };
-    }),
-    [budgets]
+      const spent = spentByCategory[b.category] || 0;
+      const pct   = Number(b.amount) > 0 ? (spent / Number(b.amount)) * 100 : 0;
+      return { ...b, icon: rule?.icon || "💰", group: rule?.group || "desejo", tip: rule?.tip || "", spentPct: pct };
+    }).sort((a, b) => b.spentPct - a.spentPct), // estourados primeiro
+    [budgets, spentByCategory]
   );
 
   // Agrupa por grupo para exibição
@@ -524,7 +526,15 @@ export default function Orcamento({ userId, onNavigate }) {
                     const color = pct > 85 ? "var(--red)" : pct > 60 ? "var(--amber)" : "var(--green)";
                     const isOpen = showTips === b.id;
                     return (
-                      <div key={b.id} style={{ paddingTop: 14, paddingBottom: idx < items.length - 1 ? 14 : 6, borderBottom: idx < items.length - 1 ? "1px solid var(--border)" : "none" }}>
+                      <div key={b.id} style={{
+                        paddingTop: 14, paddingBottom: 14,
+                        borderBottom: idx < items.length - 1 ? "1px solid var(--border)" : "none",
+                        borderRadius: over ? 10 : 0,
+                        background: over ? "var(--redbg)" : pct > 75 ? "#fffbeb" : "transparent",
+                        margin: over || pct > 75 ? "4px -4px" : "0",
+                        padding: over || pct > 75 ? "14px 12px" : "14px 0",
+                        transition: "background .2s",
+                      }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 18 }}>{b.icon}</span>
@@ -549,8 +559,14 @@ export default function Orcamento({ userId, onNavigate }) {
                             <button onClick={() => del(b.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, padding: 2 }}>×</button>
                           </div>
                         </div>
-                        <div style={{ height: 7, background: "var(--border)", borderRadius: 99 }}>
+                        <div style={{ height: 8, background: "var(--border)", borderRadius: 99, position: "relative" }}>
                           <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 99, transition: "width .4s" }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+                          <div style={{ fontSize: 11, color, fontWeight: over ? 700 : 500 }}>
+                            {over ? `${fmt(spent - Number(b.amount))} acima` : `${fmt(Number(b.amount) - spent)} livre`}
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color }}>{pct.toFixed(0)}%</div>
                         </div>
                       </div>
                     );

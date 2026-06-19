@@ -82,10 +82,10 @@ export default function Receitas({ userId, onNavigate }) {
       <EmptyBanner pageId="receitas" onNavigate={onNavigate} message="Nenhuma receita registrada ainda. Veja como funciona e registre seu primeiro salário ou entrada." />
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Receitas</h1>
+          <h1 style={{ fontWeight: 800, fontSize: 24, color: "var(--text)", letterSpacing: "-.03em" }}>Receitas</h1>
           <button onClick={() => { sessionStorage.setItem("ff_help_section", "receitas"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
         </div>
-        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Acompanhe todas as suas entradas</p>
+        <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 4, lineHeight: 1.4 }}>Acompanhe todas as suas entradas</p>
       </div>
 
       {/* KPIs */}

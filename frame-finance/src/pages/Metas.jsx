@@ -115,8 +115,19 @@ export default function Metas({ userId, onNavigate }) {
                   <span style={{ fontSize: 13, fontWeight: 700, color: done ? "var(--green)" : "var(--accent)" }}>
                     {done ? "🎉 Meta alcançada!" : `${pct.toFixed(0)}% concluído`}
                   </span>
-                  <input type="number" defaultValue={g.saved} onBlur={e => updateSaved(g.id, e.target.value)}
-                    style={{ ...inp, width: 110, fontSize: 13 }} placeholder="Atualizar" />
+                  {!done && (
+                    <button onClick={() => {
+                      const val = prompt(`Quanto você já guardou para "${g.name}"?\nAtual: R$ ${Number(g.saved).toFixed(2)}`, Number(g.saved).toFixed(2));
+                      if (val !== null && !isNaN(parseFloat(val))) updateSaved(g.id, val);
+                    }} style={{
+                      padding: "6px 14px", borderRadius: 8,
+                      background: "var(--accentbg)", color: "var(--accent)",
+                      fontWeight: 700, fontSize: 12, cursor: "pointer",
+                      border: "1px solid var(--accent)33",
+                    }}>
+                      + Atualizar valor
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -11,6 +11,7 @@ import Receitas      from "./pages/Receitas";
 import Lancamentos   from "./pages/Lancamentos";
 import Compras       from "./pages/Compras";
 import DespesasFixas from "./pages/DespesasFixas";
+import Gastos        from "./pages/Gastos";
 import Cartoes       from "./pages/Cartoes";
 import Emprestimos   from "./pages/Emprestimos";
 import Orcamento     from "./pages/Orcamento";
@@ -19,11 +20,14 @@ import Metas         from "./pages/Metas";
 import Categorias    from "./pages/Categorias";
 import Perfil        from "./pages/Perfil";
 import Historico     from "./pages/Historico";
+import Analise       from "./pages/Analise";
 import Aprendendo    from "./pages/Aprendendo";
 import Welcome       from "./components/Welcome";
 import Footer, { FooterMini } from "./components/Footer";
 import Privacidade   from "./components/Privacidade";
 import Tour          from "./components/Tour";
+import RegistrarGasto from "./components/RegistrarGasto";
+import { syncFixedExpensePayments } from "./lib/fixedExpensesSync";
 
 const THEMES = [
   { id: "blue",  color: "#7c3aed" },
@@ -35,14 +39,12 @@ const THEMES = [
 const NAV = [
   { id: "dashboard",    label: "Dashboard",        icon: "⊟", group: "main" },
   { id: "receitas",     label: "Receitas",          icon: "↑",  group: "main" },
-  { id: "lancamentos",  label: "Lançamentos",       icon: "↕",  group: "main" },
-  { id: "despesasfixas",label: "Despesas Fixas",    icon: "📌", group: "main" },
-  { id: "compras",      label: "Compras",           icon: "◻",  group: "main" },
+  { id: "gastos",       label: "Gastos",            icon: "💸", group: "main" },
   { id: "cartoes",      label: "Cartões",           icon: "▭",  group: "credito" },
   { id: "emprestimos",  label: "Empréstimos",       icon: "⊕",  group: "credito" },
   { id: "orcamento",    label: "Orçamento",         icon: "◑",  group: "planej" },
   { id: "metas",        label: "Metas",             icon: "◎",  group: "planej" },
-  { id: "relatorios",   label: "Relatórios",        icon: "≡",  group: "planej" },
+  { id: "analise",      label: "Análise",           icon: "📈", group: "planej" },
   { id: "historico",    label: "Histórico",         icon: "⏱",  group: "planej" },
   { id: "categorias",   label: "Categorias",        icon: "⊞",  group: "config" },
 ];
@@ -54,12 +56,14 @@ const GROUPS = {
   config:  { label: "Configurações" },
 };
 
-const BOTTOM_NAV = ["dashboard", "lancamentos", "cartoes", "metas"];
+const BOTTOM_NAV = ["dashboard", "gastos", "cartoes", "metas"];
 
 export default function App() {
   const [session, setSession]         = useState(null);
   const [loading, setLoading]         = useState(true);
-  const [page, setPage]               = useState("dashboard");
+  const [page, setPage] = useState(() => {
+    return sessionStorage.getItem("ff_last_page") || "dashboard";
+  });
   const [theme, setTheme]             = useState(() => localStorage.getItem("ff_theme") || "blue");
   const [profile, setProfile]         = useState(null);
   const [showPerfil, setShowPerfil]   = useState(false);
@@ -67,6 +71,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showTour, setShowTour]         = useState(false);
   const [showPrivacidade, setShowPrivacidade] = useState(false);
+  const [showRegistrar, setShowRegistrar]     = useState(false);
   const isMobile                      = useIsMobile();
   const moreRef                       = useRef(null);
 
@@ -84,15 +89,29 @@ export default function App() {
     localStorage.setItem("ff_theme", theme);
   }, [theme]);
 
-  useEffect(() => { if (session?.user) loadProfile(); }, [session]);
+  useEffect(() => {
+    if (session?.user) {
+      loadProfile();
+      // Gera pagamentos do mês para despesas fixas que ainda não foram criados
+      syncFixedExpensePayments(session.user.id);
+    }
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;
+    const shownThisSession = sessionStorage.getItem("ff_tour_shown_session");
+    if (shownThisSession) return;
+
     if (!getWelcomed()) {
       setShowWelcome(true);
-    } else if (!getTourDone() || getTourRepeat()) {
-      setTimeout(() => setShowTour(true), 600);
+    } else if (!getTourDone()) {
+      setTimeout(() => {
+        setShowTour(true);
+        sessionStorage.setItem("ff_tour_shown_session", "1");
+      }, 600);
     }
+    // getTourRepeat sozinho não mostra automaticamente
+    // o usuário precisa clicar em "Ver tour" manualmente
   }, [session]);
 
   useEffect(() => {
@@ -112,6 +131,7 @@ export default function App() {
   const navigate = (id) => {
     setPage(id);
     setShowMore(false);
+    sessionStorage.setItem("ff_last_page", id);
   };
 
   const handleStartTour = () => {
@@ -140,8 +160,10 @@ export default function App() {
 
   const pages = {
     dashboard: Dashboard, receitas: Receitas, lancamentos: Lancamentos,
+    gastos: Gastos,
     compras: Compras, despesasfixas: DespesasFixas, cartoes: Cartoes,
-    emprestimos: Emprestimos, orcamento: Orcamento, relatorios: Relatorios,
+    emprestimos: Emprestimos, orcamento: Orcamento,
+    relatorios: Analise, analise: Analise,
     metas: Metas, categorias: Categorias, historico: Historico,
     aprendendo: Aprendendo,
   };
@@ -354,6 +376,37 @@ export default function App() {
           <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
         )}
         {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
+
+        {showRegistrar && (
+          <RegistrarGasto
+            userId={session.user.id}
+            onClose={() => setShowRegistrar(false)}
+            onSaved={() => setShowRegistrar(false)}
+          />
+        )}
+
+        {/* Botão + flutuante — acima da bottom bar e do HelpButton */}
+        <button onClick={() => setShowRegistrar(true)} style={{
+          position: "fixed",
+          bottom: 84,
+          right: 72,
+          zIndex: 89,
+          width: 52, height: 52,
+          borderRadius: "50%",
+          background: "var(--accent)",
+          color: "#fff",
+          border: "none",
+          cursor: "pointer",
+          fontSize: 28,
+          fontWeight: 300,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 20px rgba(124,58,237,.5)",
+          transition: "transform .15s, box-shadow .15s",
+        }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          title="Registrar gasto"
+        >+</button>
       </div>
     );
   }
@@ -385,7 +438,7 @@ export default function App() {
               {items.map(n => {
                 const active = page === n.id;
                 return (
-                  <button key={n.id} id={`nav-${n.id}`} onClick={() => setPage(n.id)} style={{
+                  <button key={n.id} id={`nav-${n.id}`} onClick={() => { setPage(n.id); sessionStorage.setItem("ff_last_page", n.id); }} style={{
                     display: "flex", alignItems: "center", gap: 9,
                     padding: "8px 10px", borderRadius: 7, border: "none",
                     cursor: "pointer", fontWeight: active ? 600 : 400,
@@ -477,6 +530,37 @@ export default function App() {
         <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
       )}
       {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
+
+      {showRegistrar && (
+        <RegistrarGasto
+          userId={session.user.id}
+          onClose={() => setShowRegistrar(false)}
+          onSaved={() => setShowRegistrar(false)}
+        />
+      )}
+
+      {/* Botão + flutuante desktop — acima do HelpButton */}
+      <button onClick={() => setShowRegistrar(true)} style={{
+        position: "fixed",
+        bottom: 80,
+        right: 28,
+        zIndex: 89,
+        width: 52, height: 52,
+        borderRadius: "50%",
+        background: "var(--accent)",
+        color: "#fff",
+        border: "none",
+        cursor: "pointer",
+        fontSize: 28,
+        fontWeight: 300,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 4px 20px rgba(124,58,237,.5)",
+        transition: "transform .15s, box-shadow .15s",
+      }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+        title="Registrar gasto"
+      >+</button>
     </div>
   );
 }

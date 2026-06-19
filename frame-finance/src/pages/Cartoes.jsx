@@ -137,10 +137,10 @@ export default function Cartoes({ userId, onNavigate }) {
       ) : !isMobile ? (
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h1 style={{ fontWeight: 800, fontSize: 22, color: "var(--text)", letterSpacing: "-.02em" }}>Cartões</h1>
+          <h1 style={{ fontWeight: 800, fontSize: 24, color: "var(--text)", letterSpacing: "-.03em" }}>Cartões</h1>
           <button onClick={() => { sessionStorage.setItem("ff_help_section", "cartoes"); onNavigate("aprendendo"); }} title="Como usar esta seção?" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 16, padding: "2px 4px", fontWeight: 700 }}>?</button>
         </div>
-          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>Gerencie seus cartões e faturas</p>
+          <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 4, lineHeight: 1.4 }}>Gerencie seus cartões e faturas</p>
         </div>
       ) : null}
 

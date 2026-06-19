@@ -49,11 +49,13 @@ export default function Relatorios({ userId, onNavigate }) {
       supabase.from("revenues").select("*").eq("user_id", userId).order("date"),
       supabase.from("installments").select("*, purchases(description,has_interest,interest_rate,cards(name))").eq("user_id", userId).order("due_date"),
       supabase.from("loan_installments").select("*, loans(description,interest_rate)").eq("user_id", userId).order("due_date"),
-    ]).then(([{ data: t }, { data: r }, { data: i }, { data: li }]) => {
+      supabase.from("fixed_expense_payments").select("*, fixed_expenses(description,category)").eq("user_id", userId).order("due_date"),
+    ]).then(([{ data: t }, { data: r }, { data: i }, { data: li }, { data: fp }]) => {
       setTransactions(t || []);
       setRevenues(r || []);
       setInstallments(i || []);
       setLoanInst(li || []);
+      setFixedPayments(fp || []);
     });
   }, [userId]);
 
@@ -61,8 +63,10 @@ export default function Relatorios({ userId, onNavigate }) {
     return [...new Set([
       ...transactions.map(t => t.date.slice(0,7)),
       ...revenues.map(r => r.date.slice(0,7)),
+      ...fixedPayments.map(fp => (fp.due_date||"").slice(0,7)).filter(Boolean),
+      ...installments.map(i => (i.due_date||"").slice(0,7)).filter(Boolean),
     ])].sort();
-  }, [transactions, revenues]);
+  }, [transactions, revenues, fixedPayments, installments]);
 
   const months = useMemo(() => allMonths.slice(-parseInt(period)), [allMonths, period]);
 
@@ -78,13 +82,19 @@ export default function Relatorios({ userId, onNavigate }) {
   const getMonthData = (ym) => {
     const rec = revenues.filter(r => r.date.startsWith(ym)).reduce((a, r) => a + Number(r.amount), 0) +
                 transactions.filter(t => t.date.startsWith(ym) && t.type === "receita").reduce((a, t) => a + Number(t.value), 0);
-    const dep = transactions.filter(t => t.date.startsWith(ym) && t.type === "despesa").reduce((a, t) => a + Number(t.value), 0);
-    const debt = [...installments, ...loanInst].filter(i => !i.paid && (i.due_date||"").startsWith(ym)).reduce((a, i) => a + Number(i.amount), 0);
+    const depTx    = transactions.filter(t => t.date.startsWith(ym) && t.type === "despesa").reduce((a, t) => a + Number(t.value), 0);
+    const depFixed = fixedPayments.filter(fp => fp.paid && (fp.due_date||"").startsWith(ym)).reduce((a, fp) => a + Number(fp.amount), 0);
+    const depInst  = installments.filter(i => (i.due_date||"").startsWith(ym)).reduce((a, i) => a + Number(i.amount), 0);
+    const dep = depTx + depFixed + depInst;
+    const debt = [...installments, ...loanInst].filter(i => !i.paid && (i.due_date||"").startsWith(ym)).reduce((a, i) => a + Number(i.amount), 0)
+               + fixedPayments.filter(fp => !fp.paid && (fp.due_date||"").startsWith(ym)).reduce((a, fp) => a + Number(fp.amount), 0);
     const interest = installments.filter(i => (i.due_date||"").startsWith(ym) && i.purchases?.has_interest)
       .reduce((a, i) => a + (Number(i.amount) * Number(i.purchases?.interest_rate||0) / 100), 0) +
       loanInst.filter(i => (i.due_date||"").startsWith(ym)).reduce((a, i) => a + Number(i.interest_amount||0), 0);
     const catMap = {};
     transactions.filter(t => t.date.startsWith(ym) && t.type === "despesa").forEach(t => { catMap[t.cat] = (catMap[t.cat]||0) + Number(t.value); });
+    fixedPayments.filter(fp => fp.paid && (fp.due_date||"").startsWith(ym)).forEach(fp => { const cat = fp.fixed_expenses?.category||"Despesa Fixa"; catMap[cat] = (catMap[cat]||0) + Number(fp.amount); });
+    installments.filter(i => (i.due_date||"").startsWith(ym)).forEach(i => { const cat = i.purchases?.category||"Compras"; catMap[cat] = (catMap[cat]||0) + Number(i.amount); });
     return { rec, dep, bal: rec - dep, debt, interest, catMap, saving: Math.max(0, rec - dep) };
   };
 
@@ -92,11 +102,11 @@ export default function Relatorios({ userId, onNavigate }) {
   const monthlyData = useMemo(() => months.map(ym => {
     const d = getMonthData(ym);
     return { name: monthLabel(ym), Receitas: d.rec, Despesas: d.dep, Saldo: d.bal, Dívidas: d.debt };
-  }), [months, transactions, revenues, installments, loanInst]);
+  }), [months, transactions, revenues, installments, loanInst, fixedPayments]);
 
   // Comparativo data
-  const dataA = useMemo(() => compareA ? getMonthData(compareA) : null, [compareA, transactions, revenues, installments, loanInst]);
-  const dataB = useMemo(() => compareB ? getMonthData(compareB) : null, [compareB, transactions, revenues, installments, loanInst]);
+  const dataA = useMemo(() => compareA ? getMonthData(compareA) : null, [compareA, transactions, revenues, installments, loanInst, fixedPayments]);
+  const dataB = useMemo(() => compareB ? getMonthData(compareB) : null, [compareB, transactions, revenues, installments, loanInst, fixedPayments]);
 
   // All categories union
   const allCats = useMemo(() => {
@@ -122,14 +132,19 @@ export default function Relatorios({ userId, onNavigate }) {
   // Top categories
   const topCategories = useMemo(() => {
     const map = {};
-    transactions.filter(t => t.type === "despesa" && months.some(m => t.date.startsWith(m)))
+    [...transactions.filter(t => t.type === "despesa" && months.some(m => t.date.startsWith(m))),
+       ...fixedPayments.filter(fp => fp.paid && months.some(m => (fp.due_date||"").startsWith(m))).map(fp => ({ date: fp.due_date, cat: fp.fixed_expenses?.category||"Despesa Fixa", description: fp.fixed_expenses?.description||"Despesa Fixa", value: fp.amount })),
+       ...installments.filter(i => months.some(m => (i.due_date||"").startsWith(m))).map(i => ({ date: i.due_date, cat: i.purchases?.category||"Compras", description: i.purchases?.description||"Parcela", value: i.amount }))]
       .forEach(t => { map[t.cat] = (map[t.cat]||0) + Number(t.value); });
     return Object.entries(map).sort((a,b) => b[1]-a[1]).slice(0,6);
   }, [transactions, months]);
 
   // KPIs
-  const totalRev  = revenues.filter(r => months.some(m => r.date.startsWith(m))).reduce((a,r) => a+Number(r.amount), 0);
-  const totalExp  = transactions.filter(t => t.type==="despesa" && months.some(m => t.date.startsWith(m))).reduce((a,t) => a+Number(t.value), 0);
+  const totalRev  = revenues.filter(r => months.some(m => r.date.startsWith(m))).reduce((a,r) => a+Number(r.amount), 0)
+                 + transactions.filter(t => t.type==="receita" && months.some(m => t.date.startsWith(m))).reduce((a,t) => a+Number(t.value), 0);
+  const totalExp  = transactions.filter(t => t.type==="despesa" && months.some(m => t.date.startsWith(m))).reduce((a,t) => a+Number(t.value), 0)
+                 + fixedPayments.filter(fp => fp.paid && months.some(m => (fp.due_date||"").startsWith(m))).reduce((a,fp) => a+Number(fp.amount), 0)
+                 + installments.filter(i => months.some(m => (i.due_date||"").startsWith(m))).reduce((a,i) => a+Number(i.amount), 0);
   const totalInt  = interestData.reduce((a,d) => a+d["Compras"]+d["Empréstimos"], 0);
   const savingRate = totalRev > 0 ? ((totalRev-totalExp)/totalRev*100) : 0;
 
