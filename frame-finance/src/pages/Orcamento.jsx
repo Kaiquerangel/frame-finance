@@ -298,31 +298,43 @@ export default function Orcamento({ userId, onNavigate }) {
   const isMobile = useIsMobile();
   const [budgets, setBudgets]           = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [fixedPayments, setFixedPayments] = useState([]);
+  const [installments, setInstallments]   = useState([]);
+  const [loanInst, setLoanInst]           = useState([]);
   const [categories, setCategories]     = useState([]);
   const [month, setMonth]               = useState(today());
   const [loading, setLoading]           = useState(false);
   const [form, setForm]                 = useState({ category: "", amount: "" });
   const [showWizard, setShowWizard]     = useState(false);
+  const [wizardDismissed, setWizardDismissed] = useState(false);
   const [saving, setSaving]             = useState(false);
   const [showTips, setShowTips]         = useState(null); // id da categoria com dica aberta
 
   const load = async () => {
-    const [{ data: b }, { data: t }, cats] = await Promise.all([
+    const [{ data: b }, { data: t }, { data: fp }, { data: inst }, { data: li }, cats] = await Promise.all([
       supabase.from("budgets").select("*").eq("user_id", userId).eq("month", month),
       supabase.from("transactions").select("*").eq("user_id", userId).like("date", `${month}%`),
+      supabase.from("fixed_expense_payments").select("*, fixed_expenses(category)").eq("user_id", userId).like("due_date", `${month}%`),
+      supabase.from("installments").select("*, purchases(category)").eq("user_id", userId).like("due_date", `${month}%`),
+      supabase.from("loan_installments").select("*, loans(category)").eq("user_id", userId).like("due_date", `${month}%`),
       loadCategories(userId),
     ]);
     setBudgets(b || []);
     setTransactions(t || []);
+    setFixedPayments(fp || []);
+    setInstallments(inst || []);
+    setLoanInst(li || []);
     setCategories(cats.despesa || []);
   };
 
   useEffect(() => { load(); }, [userId, month]);
 
-  // Abre wizard automaticamente se não tem orçamento no mês
+  // Abre wizard automaticamente só na primeira vez que confirma que não há orçamento
+  // Não reabre se o usuário dispensou manualmente (wizardDismissed)
+  // Não reabre ao trocar de mês — cada mês pode ter orçamento diferente
   useEffect(() => {
-    if (budgets.length === 0 && !loading) setShowWizard(true);
-  }, [budgets]);
+    if (!loading && budgets.length === 0 && !wizardDismissed) setShowWizard(true);
+  }, [budgets, loading]);
 
   const save = async () => {
     if (!form.category || !form.amount) return;
@@ -343,7 +355,6 @@ export default function Orcamento({ userId, onNavigate }) {
 
   const handleWizardFinish = async (suggested) => {
     setSaving(true);
-    // Salva todos os orçamentos sugeridos de uma vez
     await Promise.all(suggested.map(s =>
       supabase.from("budgets").upsert({
         user_id: userId, category: s.category, amount: s.amount, month,
@@ -351,6 +362,7 @@ export default function Orcamento({ userId, onNavigate }) {
     ));
     await load();
     setShowWizard(false);
+    setWizardDismissed(true);
     setSaving(false);
   };
 
@@ -359,8 +371,20 @@ export default function Orcamento({ userId, onNavigate }) {
     transactions.filter(t => t.type === "despesa").forEach(t => {
       map[t.cat] = (map[t.cat] || 0) + Number(t.value);
     });
+    fixedPayments.forEach(fp => {
+      const c = fp.fixed_expenses?.category || "Outros";
+      map[c] = (map[c] || 0) + Number(fp.amount);
+    });
+    installments.forEach(i => {
+      const c = i.purchases?.category || "Outros";
+      map[c] = (map[c] || 0) + Number(i.amount);
+    });
+    loanInst.forEach(i => {
+      const c = i.loans?.category || "Outros";
+      map[c] = (map[c] || 0) + Number(i.amount);
+    });
     return map;
-  }, [transactions]);
+  }, [transactions, fixedPayments, installments, loanInst]);
 
   const totalBudget = budgets.reduce((a, b) => a + Number(b.amount), 0);
   const totalSpent  = budgets.reduce((a, b) => a + (spentByCategory[b.category] || 0), 0);
@@ -403,7 +427,7 @@ export default function Orcamento({ userId, onNavigate }) {
             </div>
           )}
           {budgets.length > 0 && (
-            <button onClick={() => setShowWizard(false)} style={{
+            <button onClick={() => { setShowWizard(false); setWizardDismissed(true); }} style={{
               padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)",
               background: "var(--bg)", color: "var(--muted)", fontSize: 13, cursor: "pointer", fontWeight: 600,
             }}>Pular →</button>

@@ -23,11 +23,11 @@ export const resetTour = () => {
 // Checklist
 export const DEFAULT_CHECKLIST = [
   { id: "receita",     label: "Adicione sua primeira receita",           page: "receitas",      icon: "up",  tip: "Coloca seu salário ou qualquer dinheiro que entrou." },
-  { id: "lancamento",  label: "Registre um gasto do dia a dia",          page: "lancamentos",   icon: "down", tip: "Mercado, farmácia, restaurante, tudo conta." },
+  { id: "lancamento",  label: "Registre um gasto do dia a dia",          page: "gastos",        icon: "down", tip: "Mercado, farmácia, restaurante, tudo conta." },
   { id: "cartao",      label: "Cadastre um cartão de crédito",           page: "cartoes",       icon: "card", tip: "Acompanhe o limite e a fatura de cada cartão." },
   { id: "orcamento",   label: "Monte seu orçamento com o assistente",    page: "orcamento",     icon: "plan", tip: "Leva menos de 3 minutos e organiza sua renda direitinho." },
   { id: "meta",        label: "Crie uma meta de economia",               page: "metas",         icon: "goal", tip: "Coloca um objetivo com valor e acompanha o progresso." },
-  { id: "despesafixa", label: "Adicione uma despesa fixa",               page: "despesasfixas", icon: "pin",  tip: "Aluguel, internet, academia, contas que chegam todo mês." },
+  { id: "despesafixa", label: "Adicione uma despesa fixa",               page: "gastos",        icon: "pin",  tip: "Aluguel, internet, academia, contas que chegam todo mês." },
   { id: "emprestimo",  label: "Registre um empréstimo ou financiamento", page: "emprestimos",   icon: "loan", tip: "Veja parcelas, juros e quanto ainda falta pagar." },
 ];
 
@@ -76,26 +76,10 @@ export const TOUR_STEPS = [
   },
   {
     id: "lancamentos",
-    page: "lancamentos",
-    target: "nav-lancamentos",
-    title: "Lançamentos",
-    desc: "Os gastos do dia a dia ficam aqui. Mercado, farmácia, Uber, almoço fora. Você filtra por mês, por categoria, busca pelo nome e edita qualquer lançamento se errar alguma coisa.",
-    position: "right",
-  },
-  {
-    id: "despesasfixas",
-    page: "despesasfixas",
-    target: "nav-despesasfixas",
-    title: "Despesas Fixas",
-    desc: "Contas que chegam todo mês ficam aqui. Aluguel, internet, academia, streaming. Você cadastra uma vez e o app já gera o registro de cada mês automaticamente, avisando quando está perto de vencer.",
-    position: "right",
-  },
-  {
-    id: "compras",
-    page: "compras",
-    target: "nav-compras",
-    title: "Compras",
-    desc: "Comprou algo parcelado no cartão? Registra aqui. Coloca o valor total, o número de parcelas e o cartão. O app divide tudo e já joga cada parcela no mês certo automaticamente.",
+    page: "gastos",
+    target: "nav-gastos",
+    title: "Gastos",
+    desc: "Todos os seus gastos ficam aqui, divididos em três abas: Avulsos (dia a dia), Parcelados (compras no cartão) e Fixos (contas que chegam todo mês). Você filtra, busca, edita e exclui qualquer lançamento.",
     position: "right",
   },
   {

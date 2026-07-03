@@ -3,8 +3,7 @@ import EmptyBanner from "../components/EmptyBanner";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../lib/useIsMobile";
 import { supabase } from "../lib/supabase";
-
-const DEFAULT_CATS = { receita: ["Salário","Freelance","Investimentos","Outros"], despesa: ["Moradia","Alimentação","Transporte","Saúde","Lazer","Educação","Outros"] };
+import { DEFAULT_CATS } from "../lib/categories";
 
 const inp = {
   width: "100%", padding: "10px 13px", borderRadius: 10,

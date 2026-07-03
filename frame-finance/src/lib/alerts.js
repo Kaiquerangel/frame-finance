@@ -1,26 +1,26 @@
 import { supabase } from "./supabase";
+import { getMonthlyCosts } from "./useMonthlyCosts";
 
 export async function generateAlerts(userId) {
   const alerts = [];
   const today = new Date();
   const thisMonth = today.toISOString().slice(0, 7);
-  const monthStart = `${thisMonth}-01`;
-  const monthEnd = `${thisMonth}-31`;
 
   const [
     { data: installments },
     { data: cards },
     { data: budgets },
-    { data: transactions },
     { data: goals },
     { data: loanInst },
+    monthlyCosts,
   ] = await Promise.all([
     supabase.from("installments").select("*, purchases(description, has_interest, cards(name, due_day, closing_day))").eq("user_id", userId).eq("paid", false),
     supabase.from("cards").select("*").eq("user_id", userId),
     supabase.from("budgets").select("*").eq("user_id", userId).eq("month", thisMonth),
-    supabase.from("transactions").select("*").eq("user_id", userId).gte("date", monthStart).lte("date", monthEnd),
     supabase.from("goals").select("*").eq("user_id", userId),
     supabase.from("loan_installments").select("*").eq("user_id", userId).eq("paid", false),
+    // byCat consolida as 4 fontes de despesa com critério padronizado
+    getMonthlyCosts(userId, thisMonth),
   ]);
 
   // 1. Parcelas vencendo em até 5 dias
@@ -43,14 +43,11 @@ export async function generateAlerts(userId) {
     }
   });
 
-  // 3. Orçamento excedido
-  const spentByCategory = {};
-  (transactions || []).filter(t => t.type === "despesa").forEach(t => {
-    spentByCategory[t.cat] = (spentByCategory[t.cat] || 0) + Number(t.value);
-  });
+  // 3. Orçamento excedido — usa byCat de getMonthlyCosts (todas as 4 fontes)
+  const spentByCategory = monthlyCosts.byCat;
   (budgets || []).forEach(b => {
     const spent = spentByCategory[b.category] || 0;
-    const pct = (spent / Number(b.amount)) * 100;
+    const pct = Number(b.amount) > 0 ? (spent / Number(b.amount)) * 100 : 0;
     if (pct >= 100) alerts.push({ type: "danger", message: `Orçamento de ${b.category} excedido! Gasto: R$ ${spent.toFixed(2)} / Limite: R$ ${Number(b.amount).toFixed(2)}` });
     else if (pct >= 80) alerts.push({ type: "warning", message: `Orçamento de ${b.category} em ${pct.toFixed(0)}% — fique atento!` });
   });

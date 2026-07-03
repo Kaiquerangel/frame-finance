@@ -11,11 +11,12 @@ const today = () => new Date().toISOString().slice(0,7);
 const ITEMS = 30;
 
 const SOURCE_CONFIG = {
-  "Lançamento":   { icon:"↓", bg:"var(--redbg)",    color:"var(--red)",    label:"Lançamento" },
-  "Receita":      { icon:"↑", bg:"var(--greenbg)",  color:"var(--green)",  label:"Receita" },
-  "Despesa Fixa": { icon:"📌", bg:"#fffbeb",         color:"#f59e0b",       label:"Fixa" },
-  "Parcela":      { icon:"💳", bg:"#eff6ff",         color:"#3b82f6",       label:"Parcela" },
-  "Receita Tx":   { icon:"↑", bg:"var(--greenbg)",  color:"var(--green)",  label:"Receita" },
+  "Lançamento":   { icon:"↓",  bg:"var(--redbg)",    color:"var(--red)",    label:"Lançamento" },
+  "Receita":      { icon:"↑",  bg:"var(--greenbg)",  color:"var(--green)",  label:"Receita" },
+  "Despesa Fixa": { icon:"📌", bg:"#fffbeb",          color:"#f59e0b",       label:"Fixa" },
+  "Parcela":      { icon:"💳", bg:"#eff6ff",          color:"#3b82f6",       label:"Parcela" },
+  "Receita Tx":   { icon:"↑",  bg:"var(--greenbg)",  color:"var(--green)",  label:"Receita" },
+  "Empréstimo":   { icon:"🏦", bg:"#f5f3ff",          color:"#7c3aed",       label:"Empréstimo" },
 };
 
 const Card = ({ children, style = {} }) => (
@@ -38,6 +39,7 @@ export default function Historico({ userId, onNavigate }) {
   const [revenues, setRevenues]             = useState([]);
   const [installments, setInstallments]     = useState([]);
   const [fixedPayments, setFixedPayments]   = useState([]);
+  const [loanInstallments, setLoanInstallments] = useState([]);
   const [goals, setGoals]                   = useState([]);
   const [cards, setCards]                   = useState([]);
   const [loading, setLoading]               = useState(true);
@@ -45,7 +47,7 @@ export default function Historico({ userId, onNavigate }) {
 
   // Filtros do extrato
   const [tab, setTab]                 = useState("extrato");
-  const [filterMonth, setFilterMonth] = useState("");          // vazio = todos
+  const [filterMonth, setFilterMonth] = useState(today().slice(0, 7)); // padrão: mês atual
   const [filterType, setFilterType]   = useState("all");
   const [filterSrc, setFilterSrc]     = useState("all");
   const [search, setSearch]           = useState("");
@@ -64,7 +66,7 @@ export default function Historico({ userId, onNavigate }) {
     try {
       const [
         { data: t }, { data: r }, { data: i },
-        { data: fp }, { data: g }, { data: c },
+        { data: fp }, { data: g }, { data: c }, { data: li },
       ] = await Promise.all([
         supabase.from("transactions").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(2000),
         supabase.from("revenues").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(2000),
@@ -72,6 +74,7 @@ export default function Historico({ userId, onNavigate }) {
         supabase.from("fixed_expense_payments").select("*, fixed_expenses(description, category)").eq("user_id", userId).order("due_date", { ascending: false }).limit(1000),
         supabase.from("goals").select("*").eq("user_id", userId),
         supabase.from("cards").select("*").eq("user_id", userId),
+        supabase.from("loan_installments").select("*, loans(description, category)").eq("user_id", userId).order("due_date", { ascending: false }).limit(1000),
       ]);
       setTransactions(t || []);
       setRevenues(r || []);
@@ -79,6 +82,7 @@ export default function Historico({ userId, onNavigate }) {
       setFixedPayments(fp || []);
       setGoals(g || []);
       setCards(c || []);
+      setLoanInstallments(li || []);
     } catch (err) {
       setLoadError("Não foi possível carregar o histórico.");
     } finally {
@@ -95,9 +99,10 @@ export default function Historico({ userId, onNavigate }) {
       ...revenues.map(r => r.date.slice(0,7)),
       ...fixedPayments.map(fp => (fp.due_date||"").slice(0,7)).filter(Boolean),
       ...installments.map(i => (i.due_date||"").slice(0,7)).filter(Boolean),
+      ...loanInstallments.map(li => (li.due_date||"").slice(0,7)).filter(Boolean),
     ]);
     return [...s].filter(Boolean).sort().reverse();
-  }, [transactions, revenues, fixedPayments, installments]);
+  }, [transactions, revenues, fixedPayments, installments, loanInstallments]);
 
   const availableYears = useMemo(() => {
     const s = new Set([
@@ -137,9 +142,16 @@ export default function Historico({ userId, onNavigate }) {
         paid:i.paid, cardName:i.purchases?.cards?.name,
         instNum:i.installment_number,
       })),
+      ...loanInstallments.map(li => ({
+        id:`li-${li.id}`, date:li.due_date,
+        desc:`${li.loans?.description||"Empréstimo"} — parcela ${li.installment_number}`,
+        cat:li.loans?.category||"Empréstimo",
+        val:-Number(li.amount), src:"Empréstimo", type:"despesa",
+        paid:li.paid,
+      })),
     ];
     return items.sort((a,b) => b.date.localeCompare(a.date));
-  }, [transactions, revenues, fixedPayments, installments]);
+  }, [transactions, revenues, fixedPayments, installments, loanInstallments]);
 
   // ── Filtra o extrato ──────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -190,10 +202,11 @@ export default function Historico({ userId, onNavigate }) {
                 + transactions.filter(t=>t.date.startsWith(ym)&&t.type==="receita").reduce((a,t)=>a+Number(t.value),0);
       const dep = transactions.filter(t=>t.date.startsWith(ym)&&t.type==="despesa").reduce((a,t)=>a+Number(t.value),0)
                 + fixedPayments.filter(fp=>fp.paid&&(fp.due_date||"").startsWith(ym)).reduce((a,fp)=>a+Number(fp.amount),0)
-                + installments.filter(i=>(i.due_date||"").startsWith(ym)).reduce((a,i)=>a+Number(i.amount),0);
+                + installments.filter(i=>(i.due_date||"").startsWith(ym)).reduce((a,i)=>a+Number(i.amount),0)
+                + loanInstallments.filter(li=>(li.due_date||"").startsWith(ym)).reduce((a,li)=>a+Number(li.amount),0);
       return { ym, label:new Date(+anoSel,idx).toLocaleDateString("pt-BR",{month:"short"}), rec, dep, bal:rec-dep };
     });
-  }, [anoSel, transactions, revenues, fixedPayments, installments]);
+  }, [anoSel, transactions, revenues, fixedPayments, installments, loanInstallments]);
 
   const annualTotals = {
     rec:  annualData.reduce((a,d)=>a+d.rec,0),
@@ -277,6 +290,7 @@ export default function Historico({ userId, onNavigate }) {
                   <option value="Receita Tx">Receitas (tx)</option>
                   <option value="Despesa Fixa">Despesas Fixas</option>
                   <option value="Parcela">Parcelas</option>
+                  <option value="Empréstimo">Empréstimos</option>
                 </select>
               </div>
               {/* Linha 2: busca + CSV + limpar */}

@@ -1,29 +1,29 @@
-import React, { useState } from "react";
-import { useIsMobile } from "../lib/useIsMobile";
+import React, { useState, useEffect } from "react";
 import { getChecklist, markChecklistItem, resetChecklist, DEFAULT_CHECKLIST } from "../lib/onboarding";
 
+function isAllDoneInStorage() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("ff_checklist") || "{}");
+    return DEFAULT_CHECKLIST.every(item => !!saved[item.id]);
+  } catch { return false; }
+}
+
 export default function Checklist({ onNavigate, onStartTour }) {
-  const isMobile = useIsMobile();
-  const [items, setItems]       = useState(getChecklist);
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("ff_checklist") || "{}");
-      return DEFAULT_CHECKLIST.every(item => !!saved[item.id]);
-    } catch { return false; }
-  });
+  const [items, setItems]         = useState(getChecklist);
+  const [collapsed, setCollapsed] = useState(isAllDoneInStorage); // começa fechado se tudo feito
 
   const done    = items.filter(i => i.done).length;
   const total   = items.length;
   const pct     = Math.round((done / total) * 100);
   const allDone = done === total;
 
-  // Fecha automaticamente quando concluir o último item
-  React.useEffect(() => {
+  // Fecha automaticamente 1.5s após completar o último item
+  useEffect(() => {
     if (allDone && !collapsed) {
       const timer = setTimeout(() => setCollapsed(true), 1500);
       return () => clearTimeout(timer);
     }
-  }, [allDone]);
+  }, [allDone, collapsed]);
 
   const handleItem = (item) => {
     markChecklistItem(item.id);
@@ -34,15 +34,17 @@ export default function Checklist({ onNavigate, onStartTour }) {
   const handleReset = () => {
     resetChecklist();
     setItems(getChecklist());
+    setCollapsed(false);
   };
 
+  // Versão colapsada
   if (collapsed) {
     return (
       <button onClick={() => setCollapsed(false)} style={{
         display: "flex", alignItems: "center", gap: 10,
         background: "var(--surface)", border: "1px solid var(--border)",
         borderRadius: 12, padding: "10px 16px", cursor: "pointer",
-        marginBottom: 16, width: "100%", textAlign: "left",
+        marginBottom: 4, width: "100%", textAlign: "left",
         boxShadow: "var(--shadow-sm)",
       }}>
         <span style={{ fontSize: 18 }}>✅</span>
@@ -51,22 +53,24 @@ export default function Checklist({ onNavigate, onStartTour }) {
           <div style={{ fontSize: 11, color: "var(--muted)" }}>{done} de {total} feitos</div>
         </div>
         <div style={{ width: 60, height: 5, background: "var(--border)", borderRadius: 99 }}>
-          <div style={{ height: "100%", width: `${pct}%`, background: "var(--accent)", borderRadius: 99 }} />
+          <div style={{ height: "100%", width: `${pct}%`, background: allDone ? "var(--green)" : "var(--accent)", borderRadius: 99 }} />
         </div>
         <span style={{ fontSize: 12, color: "var(--muted)" }}>▲</span>
       </button>
     );
   }
 
+  // Versão expandida
   return (
     <div style={{
-      background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)",
-      marginBottom: 20, boxShadow: "var(--shadow-sm)", overflow: "hidden",
+      background: "var(--surface)", borderRadius: 16,
+      border: "1px solid var(--border)", marginBottom: 4,
+      boxShadow: "var(--shadow-sm)", overflow: "hidden",
     }}>
       {/* Header */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "16px 20px",
+        padding: "14px 18px",
         background: allDone ? "var(--greenbg)" : "var(--accentbg)",
         borderBottom: "1px solid var(--border)",
       }}>
@@ -79,15 +83,15 @@ export default function Checklist({ onNavigate, onStartTour }) {
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>
               {allDone
                 ? "Agora é só usar e deixar o app trabalhar por você."
-                : `${done} de ${total} feitos · ${pct}%`}
+                : `${done} de ${total} feitos`}
             </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {allDone && (
             <button onClick={handleReset} style={{
-              fontSize: 12, color: "var(--muted)", background: "none", border: "none",
-              cursor: "pointer", fontWeight: 600,
+              fontSize: 12, color: "var(--muted)", background: "none",
+              border: "none", cursor: "pointer", fontWeight: 600,
             }}>Resetar</button>
           )}
           <button onClick={() => setCollapsed(true)} style={{
@@ -98,7 +102,7 @@ export default function Checklist({ onNavigate, onStartTour }) {
       </div>
 
       {/* Barra de progresso */}
-      <div style={{ height: 5, background: "var(--border)" }}>
+      <div style={{ height: 4, background: "var(--border)" }}>
         <div style={{
           height: "100%", width: `${pct}%`,
           background: allDone ? "var(--green)" : "var(--accent)",
@@ -107,29 +111,26 @@ export default function Checklist({ onNavigate, onStartTour }) {
       </div>
 
       {/* Items */}
-      <div style={{ padding: "8px 0" }}>
+      <div style={{ padding: "6px 0" }}>
         {items.map((item, i) => (
           <div key={item.id} style={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "flex-start" : "center",
-            gap: isMobile ? 8 : 12,
-            padding: isMobile ? "14px 16px" : "12px 20px",
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "11px 18px",
             borderBottom: i < items.length - 1 ? "1px solid var(--border)" : "none",
-            opacity: item.done ? .55 : 1,
-            transition: "opacity .2s",
+            opacity: item.done ? .5 : 1,
           }}>
+            {/* Checkbox */}
             <div style={{
               width: 22, height: 22, borderRadius: 7, flexShrink: 0,
               border: `2px solid ${item.done ? "var(--green)" : "var(--border)"}`,
               background: item.done ? "var(--green)" : "transparent",
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#fff", fontSize: 12, fontWeight: 700,
-              transition: "all .2s",
             }}>
               {item.done ? "✓" : ""}
             </div>
 
+            {/* Texto */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 fontSize: 13, fontWeight: 600, color: "var(--text)",
@@ -138,15 +139,13 @@ export default function Checklist({ onNavigate, onStartTour }) {
               <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{item.tip}</div>
             </div>
 
+            {/* Botão ir */}
             {!item.done && (
               <button onClick={() => handleItem(item)} style={{
-                padding: isMobile ? "10px 0" : "6px 14px",
-                width: isMobile ? "100%" : "auto",
-                borderRadius: 8, border: "none",
+                padding: "6px 14px", borderRadius: 8, border: "none",
                 background: "var(--accent)", color: "#fff",
-                fontWeight: 700, fontSize: isMobile ? 14 : 12,
-                cursor: "pointer", whiteSpace: "nowrap",
-                flexShrink: 0,
+                fontWeight: 700, fontSize: 12, cursor: "pointer",
+                whiteSpace: "nowrap", flexShrink: 0,
               }}>Ir →</button>
             )}
           </div>
@@ -156,7 +155,7 @@ export default function Checklist({ onNavigate, onStartTour }) {
       {/* Footer */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "12px 20px", borderTop: "1px solid var(--border)",
+        padding: "10px 18px", borderTop: "1px solid var(--border)",
         background: "var(--bg)",
       }}>
         <button onClick={onStartTour} style={{

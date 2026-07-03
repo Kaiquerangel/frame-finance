@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { loadCategories } from "../lib/categories";
 import { useIsMobile } from "../lib/useIsMobile";
+import { syncFixedExpensePayments } from "../lib/fixedExpensesSync";
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 const today = () => new Date().toISOString().split("T")[0];
@@ -20,6 +21,14 @@ const Label = ({ children }) => (
 );
 
 const TIPOS = [
+  {
+    id: "rapido",
+    icon: "⚡",
+    label: "Lançamento rápido",
+    desc: "Valor + categoria — lança em 5 segundos",
+    color: "var(--green)",
+    bg: "var(--greenbg)",
+  },
   {
     id: "unico",
     icon: "💸",
@@ -53,26 +62,19 @@ const PAYMENT_METHODS = [
   { id: "dinheiro", label: "Dinheiro", icon: "💵" },
 ];
 
-function calcPmt(total, n, hasInterest, rate) {
-  if (!hasInterest || !rate || n <= 1) return total / n;
-  const r = rate / 100;
-  return total * (r * Math.pow(1+r, n)) / (Math.pow(1+r, n) - 1);
-}
-
 export default function RegistrarGasto({ userId, onClose, onSaved }) {
   const isMobile = useIsMobile();
-  const [step, setStep]           = useState("tipo");   // "tipo" | "form"
+  const [step, setStep]           = useState("tipo");
   const [tipo, setTipo]           = useState(null);
   const [loading, setLoading]     = useState(false);
   const [categories, setCategories] = useState({ despesa: [] });
   const [cards, setCards]         = useState([]);
 
-  // Formulário único — campos que variam por tipo
   const EMPTY = {
     description: "", category: "", value: "", date: today(),
     // parcelado
     payment_method: "credito", card_id: "",
-    installments: "1", has_interest: false, interest_rate: "",
+    installments: "1", installment_value: "",
     // fixo
     due_day: "", start_date: today().slice(0,7) + "-01",
   };
@@ -91,19 +93,39 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
 
   const selectedCard = cards.find(c => c.id === form.card_id);
 
-  const pmt = form.value && form.installments
-    ? calcPmt(parseFloat(form.value), parseInt(form.installments), form.has_interest, parseFloat(form.interest_rate || 0))
-    : 0;
+  // Preview do parcelado: usuário informa valor da parcela + n → app calcula total e juros
+  const parceladoPreview = useMemo(() => {
+    const parcela = parseFloat(form.installment_value || 0);
+    const n       = parseInt(form.installments || 1);
+    const total   = parseFloat(form.value || 0);
+    if (!parcela || !n) return null;
+    const totalPay = parseFloat((parcela * n).toFixed(2));
+    const juros    = total > 0 ? parseFloat((totalPay - total).toFixed(2)) : 0;
+    return { totalPay, juros, hasJuros: juros > 0.01 };
+  }, [form.installment_value, form.installments, form.value]);
 
-  const canSave = form.description && form.value && form.category &&
-    (tipo !== "parcelado" || (form.payment_method !== "credito" || form.card_id));
+  const canSave = form.description !== undefined &&
+    (tipo === "rapido"    ? (form.value && form.category) :
+     tipo === "unico"     ? (form.description && form.value && form.category) :
+     tipo === "parcelado" ? (form.description && form.category && (form.payment_method !== "credito" ? form.value : (form.card_id && form.installment_value))) :
+     tipo === "fixo"      ? (form.description && form.value && form.category && form.due_day) : false);
 
   const handleSave = async () => {
     if (!canSave) return;
     setLoading(true);
 
     try {
-      if (tipo === "unico") {
+      if (tipo === "rapido") {
+        // Lançamento rápido: só valor + categoria, descrição opcional, data = hoje
+        await supabase.from("transactions").insert({
+          user_id: userId, type: "despesa",
+          description: form.description || form.category,
+          value: parseFloat(form.value),
+          cat: form.category,
+          date: today(),
+        });
+
+      } else if (tipo === "unico") {
         // Salva como transaction
         await supabase.from("transactions").insert({
           user_id: userId,
@@ -114,22 +136,32 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
           date: form.date,
         });
 
+      } else if (tipo === "parcelado" && form.payment_method !== "credito") {
+        await supabase.from("transactions").insert({
+          user_id: userId, type: "despesa",
+          description: form.description,
+          value: parseFloat(form.value),
+          cat: form.category, date: form.date,
+        });
+
       } else if (tipo === "parcelado") {
-        // Salva como purchase + installments
-        const numInst = parseInt(form.installments || 1);
-        const totalAmount = parseFloat(form.value);
-        const card = selectedCard || null;
+        // Crédito: o usuário informa valor da compra + valor da parcela + n
+        // Não usa fórmula de PMT — usa o valor real informado pelo banco/loja
+        const numInst      = parseInt(form.installments || 1);
+        const parcela      = parseFloat(form.installment_value);
+        const totalCompra  = parseFloat(form.value);
+        const card         = selectedCard || null;
 
         const { data: purchase, error } = await supabase.from("purchases").insert({
           user_id: userId,
           description: form.description,
           category: form.category,
-          total_amount: totalAmount,
-          payment_method: form.payment_method,
-          card_id: form.payment_method === "credito" ? form.card_id : null,
+          total_amount: totalCompra,
+          payment_method: "credito",
+          card_id: form.card_id,
           installments: numInst,
-          has_interest: form.has_interest,
-          interest_rate: parseFloat(form.interest_rate || 0),
+          has_interest: parceladoPreview?.hasJuros || false,
+          interest_rate: 0,
           purchase_date: form.date,
         }).select().single();
 
@@ -150,7 +182,7 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
               purchase_id: purchase.id,
               user_id: userId,
               installment_number: i + 1,
-              amount: parseFloat(pmt.toFixed(2)),
+              amount: parseFloat(parcela.toFixed(2)),
               due_date: dueDate.toISOString().split("T")[0],
               paid: false,
             });
@@ -159,11 +191,14 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
         }
 
       } else if (tipo === "fixo") {
-        // Salva como fixed_expense + gera o payment do mês atual
+        // Salva como fixed_expense e deixa a função única gerar os pagamentos
+        // (mês anterior + atual + 2 próximos), já com `month` preenchido
+        // corretamente — antes esse insert era feito na mão aqui mesmo, sem
+        // a coluna `month` (NOT NULL), e falhava silenciosamente.
         const dueDay = parseInt(form.due_day || 1);
         const [y, m] = form.start_date.slice(0,7).split("-").map(Number);
 
-        const { data: fixedExp, error } = await supabase.from("fixed_expenses").insert({
+        const { error } = await supabase.from("fixed_expenses").insert({
           user_id: userId,
           description: form.description,
           category: form.category,
@@ -171,20 +206,10 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
           due_day: dueDay,
           start_date: `${y}-${String(m).padStart(2,"0")}-01`,
           active: true,
-        }).select().single();
+        });
 
-        if (!error && fixedExp) {
-          // Gera payment para o mês atual
-          const today_d = new Date();
-          const thisMonth = today_d.toISOString().slice(0,7);
-          const dueDate = `${thisMonth}-${String(dueDay).padStart(2,"0")}`;
-          await supabase.from("fixed_expense_payments").insert({
-            user_id: userId,
-            fixed_expense_id: fixedExp.id,
-            amount: parseFloat(form.value),
-            due_date: dueDate,
-            paid: false,
-          });
+        if (!error) {
+          await syncFixedExpensePayments(userId);
         }
       }
 
@@ -302,35 +327,93 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
           {step === "form" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-              {/* Descrição */}
-              <div>
-                <Label>Descrição</Label>
-                <input value={form.description} onChange={e => f("description", e.target.value)}
-                  placeholder={
-                    tipo === "unico" ? "Ex: Mercado Extra, Farmácia..." :
-                    tipo === "parcelado" ? "Ex: iPhone 15, Geladeira Samsung..." :
-                    "Ex: Aluguel, Internet Vivo..."
-                  }
-                  maxLength={150} style={inp} autoFocus />
-              </div>
+              {/* Descrição + Valor + Categoria — só pros tipos que não têm form próprio */}
+              {tipo !== "rapido" && (
+                <>
+                  <div>
+                    <Label>Descrição</Label>
+                    <input value={form.description} onChange={e => f("description", e.target.value)}
+                      placeholder={
+                        tipo === "unico"     ? "Ex: Mercado Extra, Farmácia..." :
+                        tipo === "parcelado" ? "Ex: iPhone 15, Geladeira Samsung..." :
+                        "Ex: Aluguel, Internet Vivo..."
+                      }
+                      maxLength={150} style={inp} autoFocus />
+                  </div>
 
-              {/* Valor + Categoria */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <Label>Valor {tipo === "parcelado" ? "total (R$)" : "(R$)"}</Label>
-                  <input type="number" value={form.value} onChange={e => f("value", e.target.value)}
-                    placeholder="0,00" style={inp} />
-                </div>
-                <div>
-                  <Label>Categoria</Label>
-                  <select value={form.category} onChange={e => f("category", e.target.value)} style={inp}>
-                    <option value="">Selecionar...</option>
-                    {categories.despesa.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <Label>Valor {tipo === "parcelado" ? "total (R$)" : "(R$)"}</Label>
+                      <input type="number" value={form.value} onChange={e => f("value", e.target.value)}
+                        placeholder="0,00" style={inp} />
+                    </div>
+                    <div>
+                      <Label>Categoria</Label>
+                      <select value={form.category} onChange={e => f("category", e.target.value)} style={inp}>
+                        <option value="">Selecionar...</option>
+                        {categories.despesa.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Campos específicos por tipo */}
+              {/* ── RÁPIDO ─────────────────────────────────────── */}
+              {tipo === "rapido" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                  {/* Valor — input grande, foco imediato */}
+                  <div>
+                    <Label>Valor (R$)</Label>
+                    <input
+                      type="number"
+                      value={form.value}
+                      onChange={e => f("value", e.target.value)}
+                      placeholder="0,00"
+                      autoFocus
+                      style={{ ...inp, fontSize: 26, fontWeight: 800, padding: "14px 16px", textAlign: "center" }}
+                    />
+                  </div>
+
+                  {/* Categoria */}
+                  <div>
+                    <Label>Categoria</Label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {categories.despesa.map(cat => (
+                        <button key={cat} onClick={() => f("category", cat)} style={{
+                          padding: "8px 14px", borderRadius: 99, border: "1.5px solid",
+                          borderColor: form.category === cat ? "var(--green)" : "var(--border)",
+                          background: form.category === cat ? "var(--greenbg)" : "var(--bg)",
+                          color: form.category === cat ? "var(--green)" : "var(--text)",
+                          fontWeight: 600, fontSize: 13, cursor: "pointer",
+                          transition: "all .12s",
+                        }}>{cat}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Descrição opcional */}
+                  <div>
+                    <Label>Descrição <span style={{ color: "var(--muted)", fontWeight: 400 }}>(opcional)</span></Label>
+                    <input
+                      value={form.description}
+                      onChange={e => f("description", e.target.value)}
+                      placeholder="Ex: Mercado, Farmácia..."
+                      maxLength={100}
+                      style={inp}
+                      onKeyDown={e => e.key === "Enter" && canSave && handleSave()}
+                    />
+                  </div>
+
+                  {/* Info: data automática */}
+                  <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center" }}>
+                    📅 Data registrada como hoje automaticamente
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÚNICO ──────────────────────────────────────── */}
               {tipo === "unico" && (
                 <div>
                   <Label>Data</Label>
@@ -359,59 +442,70 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
                     </div>
                   </div>
 
-                  {/* Cartão (se crédito) */}
-                  {form.payment_method === "credito" && (
-                    <div>
-                      <Label>Cartão</Label>
-                      <select value={form.card_id} onChange={e => f("card_id", e.target.value)} style={inp}>
-                        <option value="">Selecionar cartão...</option>
-                        {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Parcelas + Juros */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div>
-                      <Label>Parcelas</Label>
-                      <select value={form.installments} onChange={e => f("installments", e.target.value)} style={inp}>
-                        {[1,2,3,4,5,6,7,8,9,10,11,12,18,24].map(n => (
-                          <option key={n} value={n}>{n === 1 ? "À vista" : `${n}x`}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <Label>Data da compra</Label>
-                      <input type="date" value={form.date} onChange={e => f("date", e.target.value)} style={inp} />
-                    </div>
-                  </div>
-
-                  {/* Juros */}
-                  {parseInt(form.installments) > 1 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <input type="checkbox" checked={form.has_interest}
-                        onChange={e => f("has_interest", e.target.checked)}
-                        style={{ accentColor: "var(--accent)", width: 16, height: 16 }} />
-                      <span style={{ fontSize: 13, color: "var(--muted)" }}>Tem juros</span>
-                      {form.has_interest && (
-                        <input type="number" value={form.interest_rate}
-                          onChange={e => f("interest_rate", e.target.value)}
-                          placeholder="% ao mês" style={{ ...inp, width: 120, flex: "none" }} />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Preview */}
-                  {form.value && parseInt(form.installments) > 1 && (
-                    <div style={{ background: "var(--accentbg)", borderRadius: 10, padding: "12px 14px", fontSize: 13 }}>
-                      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-                        <span>Parcela: <strong style={{ color: "var(--accent)" }}>{fmt(pmt)}</strong></span>
-                        <span>Total: <strong>{fmt(pmt * parseInt(form.installments))}</strong></span>
-                        {form.has_interest && parseFloat(form.interest_rate) > 0 && (
-                          <span>Juros: <strong style={{ color: "var(--red)" }}>{fmt(pmt * parseInt(form.installments) - parseFloat(form.value))}</strong></span>
-                        )}
+                  {form.payment_method === "credito" ? (
+                    <>
+                      {/* Cartão */}
+                      <div>
+                        <Label>Cartão</Label>
+                        <select value={form.card_id} onChange={e => f("card_id", e.target.value)} style={inp}>
+                          <option value="">Selecionar cartão...</option>
+                          {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
                       </div>
-                    </div>
+
+                      {/* Valor da parcela + n + data */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <Label>Valor da parcela (R$)</Label>
+                          <input type="number" value={form.installment_value}
+                            onChange={e => f("installment_value", e.target.value)}
+                            placeholder="Ex: 32,06"
+                            style={inp} />
+                          <div style={{ fontSize: 10, color:"var(--muted)", marginTop:3 }}>Conforme cobrado no cartão</div>
+                        </div>
+                        <div>
+                          <Label>Número de parcelas</Label>
+                          <select value={form.installments} onChange={e => f("installments", e.target.value)} style={inp}>
+                            {[1,2,3,4,5,6,7,8,9,10,11,12,18,24].map(n => (
+                              <option key={n} value={n}>{n === 1 ? "À vista (1x)" : `${n}x`}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Data da compra</Label>
+                        <input type="date" value={form.date} onChange={e => f("date", e.target.value)} style={inp} />
+                      </div>
+
+                      {/* Preview */}
+                      {parceladoPreview && (
+                        <div style={{ background:"var(--accentbg)", borderRadius:10, padding:"12px 14px", fontSize:13, display:"flex", flexWrap:"wrap", gap:16 }}>
+                          <div>
+                            <span style={{ color:"var(--muted)" }}>Total a pagar: </span>
+                            <strong>{fmt(parceladoPreview.totalPay)}</strong>
+                          </div>
+                          {form.value && (
+                            <div>
+                              <span style={{ color:"var(--muted)" }}>Juros: </span>
+                              <strong style={{ color: parceladoPreview.hasJuros ? "var(--red)" : "var(--green)" }}>
+                                {parceladoPreview.hasJuros ? fmt(parceladoPreview.juros) : "Sem juros 🎉"}
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <Label>Data</Label>
+                        <input type="date" value={form.date} onChange={e => f("date", e.target.value)} style={inp} />
+                      </div>
+                      <div style={{ background:"var(--accentbg)", borderRadius:10, padding:"11px 14px", fontSize:13, color:"var(--accent)" }}>
+                        Pago à vista — registrado como Gasto Único, sem entrar na fatura do cartão.
+                      </div>
+                    </>
                   )}
                 </>
               )}

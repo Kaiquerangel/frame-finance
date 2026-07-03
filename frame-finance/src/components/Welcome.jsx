@@ -1,4 +1,4 @@
-import { setWelcomed } from "../lib/onboarding";
+import { setWelcomed, setTourDone } from "../lib/onboarding";
 import { useIsMobile } from "../lib/useIsMobile";
 
 export default function Welcome({ onStartTour, onSkip }) {
@@ -90,7 +90,7 @@ export default function Welcome({ onStartTour, onSkip }) {
           }}>
             🗺️ Fazer o tour guiado
           </button>
-          <button onClick={() => { setWelcomed(); onSkip(); }} style={{
+          <button onClick={() => { setWelcomed(); setTourDone(); onSkip(); }} style={{
             padding: isMobile ? "14px 0" : "12px 0",
             borderRadius: 12, border: "1px solid var(--border)",
             background: "transparent", color: "var(--muted)",

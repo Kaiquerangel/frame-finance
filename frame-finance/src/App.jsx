@@ -8,26 +8,25 @@ import { useIsMobile } from "./lib/useIsMobile";
 import Auth          from "./pages/Auth";
 import Dashboard     from "./pages/Dashboard";
 import Receitas      from "./pages/Receitas";
-import Lancamentos   from "./pages/Lancamentos";
-import Compras       from "./pages/Compras";
-import DespesasFixas from "./pages/DespesasFixas";
 import Gastos        from "./pages/Gastos";
 import Cartoes       from "./pages/Cartoes";
 import Emprestimos   from "./pages/Emprestimos";
 import Orcamento     from "./pages/Orcamento";
-import Relatorios    from "./pages/Relatorios";
 import Metas         from "./pages/Metas";
 import Categorias    from "./pages/Categorias";
-import Perfil        from "./pages/Perfil";
+import Perfil        from "./components/Perfil";
 import Historico     from "./pages/Historico";
 import Analise       from "./pages/Analise";
 import Aprendendo    from "./pages/Aprendendo";
+import Visao         from "./pages/Visao";
 import Welcome       from "./components/Welcome";
 import Footer, { FooterMini } from "./components/Footer";
 import Privacidade   from "./components/Privacidade";
 import Tour          from "./components/Tour";
 import RegistrarGasto from "./components/RegistrarGasto";
 import { syncFixedExpensePayments } from "./lib/fixedExpensesSync";
+import { syncRecurringRevenues }    from "./lib/revenueSync";
+import BuscaGlobal from "./components/BuscaGlobal";
 
 const THEMES = [
   { id: "blue",  color: "#7c3aed" },
@@ -45,6 +44,7 @@ const NAV = [
   { id: "orcamento",    label: "Orçamento",         icon: "◑",  group: "planej" },
   { id: "metas",        label: "Metas",             icon: "◎",  group: "planej" },
   { id: "analise",      label: "Análise",           icon: "📈", group: "planej" },
+  { id: "visao",        label: "Visão Financeira",  icon: "◈",  group: "planej" },
   { id: "historico",    label: "Histórico",         icon: "⏱",  group: "planej" },
   { id: "categorias",   label: "Categorias",        icon: "⊞",  group: "config" },
 ];
@@ -72,6 +72,19 @@ export default function App() {
   const [showTour, setShowTour]         = useState(false);
   const [showPrivacidade, setShowPrivacidade] = useState(false);
   const [showRegistrar, setShowRegistrar]     = useState(false);
+  const [showSearch, setShowSearch]           = useState(false);
+
+  // Atalho global Ctrl+K / Cmd+K para busca
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
   const isMobile                      = useIsMobile();
   const moreRef                       = useRef(null);
 
@@ -91,27 +104,36 @@ export default function App() {
 
   useEffect(() => {
     if (session?.user) {
-      loadProfile();
-      // Gera pagamentos do mês para despesas fixas que ainda não foram criados
+      loadProfile(session.user.id);
       syncFixedExpensePayments(session.user.id);
+      syncRecurringRevenues(session.user.id);
     }
   }, [session]);
 
   useEffect(() => {
     if (!session) return;
-    const shownThisSession = sessionStorage.getItem("ff_tour_shown_session");
-    if (shownThisSession) return;
 
-    if (!getWelcomed()) {
+    // Tour só aparece automaticamente se nunca foi completado
+    // Usa localStorage para persistir entre sessões
+    const tourDone = getTourDone();
+    const welcomed = getWelcomed();
+
+    if (!welcomed) {
       setShowWelcome(true);
-    } else if (!getTourDone()) {
+      return;
+    }
+
+    // Se já completou o tour, nunca abre automático — ponto final
+    if (tourDone) return;
+
+    // Nunca completou: mostra só uma vez por sessão
+    const shownThisSession = sessionStorage.getItem("ff_tour_shown_session");
+    if (!shownThisSession) {
       setTimeout(() => {
         setShowTour(true);
         sessionStorage.setItem("ff_tour_shown_session", "1");
       }, 600);
     }
-    // getTourRepeat sozinho não mostra automaticamente
-    // o usuário precisa clicar em "Ver tour" manualmente
   }, [session]);
 
   useEffect(() => {
@@ -123,8 +145,10 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showMore]);
 
-  const loadProfile = async () => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+  const loadProfile = async (uid) => {
+    const id = uid ?? session?.user?.id;
+    if (!id) return;
+    const { data } = await supabase.from("profiles").select("*").eq("id", id).single();
     setProfile(data);
   };
 
@@ -159,13 +183,12 @@ export default function App() {
   if (!session) return <Auth />;
 
   const pages = {
-    dashboard: Dashboard, receitas: Receitas, lancamentos: Lancamentos,
-    gastos: Gastos,
-    compras: Compras, despesasfixas: DespesasFixas, cartoes: Cartoes,
+    dashboard: Dashboard, receitas: Receitas,
+    gastos: Gastos, cartoes: Cartoes,
     emprestimos: Emprestimos, orcamento: Orcamento,
-    relatorios: Analise, analise: Analise,
+    analise: Analise,
     metas: Metas, categorias: Categorias, historico: Historico,
-    aprendendo: Aprendendo,
+    aprendendo: Aprendendo, visao: Visao,
   };
 
   const PageComponent = pages[page] || Dashboard;
@@ -183,6 +206,23 @@ export default function App() {
   // Botões de ajuda, aparecem próximos em ambos os layouts
   const HelpButtons = ({ inSheet = false }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: inSheet ? "0 20px" : "8px 0" }}>
+      <button onClick={() => setShowSearch(true)} style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: inSheet ? "11px 14px" : "8px 10px",
+        borderRadius: 9, cursor: "pointer", border: "none",
+        background: inSheet ? "var(--bg)" : "rgba(255,255,255,.06)",
+        color: inSheet ? "var(--muted)" : "var(--sid-muted)",
+        fontSize: inSheet ? 14 : 12, fontWeight: 600, textAlign: "left",
+        width: "100%",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: inSheet ? 18 : 14 }}>🔍</span>
+          Buscar
+        </div>
+        {!inSheet && (
+          <span style={{ fontSize: 9, color: "var(--sid-muted)", background: "rgba(255,255,255,.1)", padding: "2px 5px", borderRadius: 4 }}>⌘K</span>
+        )}
+      </button>
       <button onClick={() => { navigate("aprendendo"); }} style={{
         display: "flex", alignItems: "center", gap: 8,
         padding: inSheet ? "11px 14px" : "8px 10px",
@@ -200,7 +240,7 @@ export default function App() {
       <button onClick={handleStartTourManual} style={{
         display: "flex", alignItems: "center", gap: 8,
         padding: inSheet ? "11px 14px" : "8px 10px",
-        borderRadius: 9, border: "none", cursor: "pointer",
+        borderRadius: 9, cursor: "pointer",
         background: inSheet ? "var(--bg)" : "rgba(255,255,255,.06)",
         color: inSheet ? "var(--text)" : "var(--sid-muted)",
         fontSize: inSheet ? 14 : 12, fontWeight: 600, textAlign: "left",
@@ -218,9 +258,11 @@ export default function App() {
     return (
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "var(--bg)" }}>
 
+        {showSearch && session && (
+          <BuscaGlobal userId={session.user.id} onNavigate={navigate} onClose={() => setShowSearch(false)} />
+        )}
         {showWelcome && <Welcome onStartTour={handleStartTour} onSkip={() => setShowWelcome(false)} />}
         {showTour && !showWelcome && <Tour onNavigate={navigate} onEnd={handleTourEnd} />}
-
         {/* Header */}
         <header style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
@@ -373,7 +415,7 @@ export default function App() {
         </nav>
 
         {showPerfil && (
-          <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
+          <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={() => loadProfile(session.user.id)} />
         )}
         {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
 
@@ -415,6 +457,9 @@ export default function App() {
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
 
+      {showSearch && session && (
+        <BuscaGlobal userId={session.user.id} onNavigate={navigate} onClose={() => setShowSearch(false)} />
+      )}
       {showWelcome && <Welcome onStartTour={handleStartTour} onSkip={() => setShowWelcome(false)} />}
       {showTour && !showWelcome && <Tour onNavigate={navigate} onEnd={handleTourEnd} />}
 
@@ -527,7 +572,7 @@ export default function App() {
       </main>
 
       {showPerfil && (
-        <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
+        <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={() => loadProfile(session.user.id)} />
       )}
       {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
 

@@ -1,60 +1,71 @@
 // Geração automática de pagamentos de despesas fixas
-// Roda quando o app abre e garante que o mês atual tem pagamentos gerados
+// Roda quando o app abre e garante que o mês atual + os próximos têm pagamentos gerados.
+//
+// Fonte única de verdade: tanto o App.jsx (no load da sessão) quanto a criação de
+// uma despesa fixa nova (RegistrarGasto.jsx) e a tela de Despesas Fixas chamam
+// esta mesma função — evita ter duas implementações divergentes gerando a
+// mesma tabela de formas diferentes (foi exatamente isso que causou o bug do
+// Shopee-01: a rota antiga não enviava a coluna `month`, que é NOT NULL).
 
 import { supabase } from "./supabase";
 
 export async function syncFixedExpensePayments(userId) {
   try {
-    const today     = new Date();
-    const thisMonth = today.toISOString().slice(0, 7); // "2026-06"
+    // Gera para o mês anterior, o atual e os 2 próximos — cobre quem fica
+    // um tempo sem abrir o app sem deixar fatura faltando, e ainda garante
+    // que mexer em "Despesa Fixa" no FAB já deixa o pagamento do mês pronto.
+    const months = [];
+    const now = new Date();
+    for (let i = -1; i <= 2; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      months.push(d.toISOString().slice(0, 7));
+    }
 
-    // 1. Busca todas as despesas fixas ativas do usuário
     const { data: fixedExpenses, error: feError } = await supabase
       .from("fixed_expenses")
       .select("*")
       .eq("user_id", userId)
       .eq("active", true);
 
-    if (feError || !fixedExpenses || fixedExpenses.length === 0) return;
+    if (feError || !fixedExpenses || fixedExpenses.length === 0) return 0;
 
-    // 2. Busca pagamentos já existentes neste mês
-    const { data: existing } = await supabase
-      .from("fixed_expense_payments")
-      .select("fixed_expense_id")
-      .eq("user_id", userId)
-      .gte("due_date", `${thisMonth}-01`)
-      .lte("due_date", `${thisMonth}-31`);
-
-    const existingIds = new Set((existing || []).map(p => p.fixed_expense_id));
-
-    // 3. Para cada despesa fixa que ainda não tem pagamento neste mês, gera um
-    const toInsert = [];
+    const rows = [];
     for (const fe of fixedExpenses) {
-      if (existingIds.has(fe.id)) continue;
+      const dueDay = Math.min(parseInt(fe.due_day || 1), 28);
 
-      // Verifica se a despesa já deve estar ativa neste mês
-      const startMonth = fe.start_date ? fe.start_date.slice(0, 7) : "2000-01";
-      if (startMonth > thisMonth) continue; // ainda não chegou o mês de início
+      for (const month of months) {
+        const [y, m] = month.split("-").map(Number);
+        const dueDate = new Date(y, m - 1, dueDay);
 
-      // Monta a data de vencimento
-      const dueDay    = parseInt(fe.due_day || 1);
-      const dueDayStr = String(Math.min(dueDay, 28)).padStart(2, "0");
-      const dueDate   = `${thisMonth}-${dueDayStr}`;
+        // Respeita o início e o fim de vigência da despesa fixa
+        if (fe.start_date && dueDate < new Date(fe.start_date)) continue;
+        if (fe.end_date && dueDate > new Date(fe.end_date)) continue;
 
-      toInsert.push({
-        user_id:           userId,
-        fixed_expense_id:  fe.id,
-        amount:            fe.amount,
-        due_date:          dueDate,
-        paid:              false,
-      });
+        rows.push({
+          user_id: userId,
+          fixed_expense_id: fe.id,
+          month,
+          amount: fe.amount,
+          due_date: dueDate.toISOString().split("T")[0],
+          paid: false,
+        });
+      }
     }
 
-    if (toInsert.length > 0) {
-      await supabase.from("fixed_expense_payments").insert(toInsert);
+    if (rows.length === 0) return 0;
+
+    // upsert com onConflict evita duplicar quem já existe e não derruba
+    // o resto do lote se uma linha já estiver lá
+    const { error: upsertError } = await supabase
+      .from("fixed_expense_payments")
+      .upsert(rows, { onConflict: "fixed_expense_id,month", ignoreDuplicates: true });
+
+    if (upsertError) {
+      console.error("Erro ao sincronizar despesas fixas:", upsertError);
+      return 0;
     }
 
-    return toInsert.length; // retorna quantos foram gerados
+    return rows.length;
   } catch (err) {
     console.error("Erro ao sincronizar despesas fixas:", err);
     return 0;

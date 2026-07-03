@@ -3,6 +3,7 @@ import Privacidade from "../components/Privacidade";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { useIsMobile } from "../lib/useIsMobile";
+import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 const monthLabel = (ym) => { const [y, m] = ym.split("-"); return new Date(+y, +m-1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }); };
@@ -34,15 +35,19 @@ export default function Cartoes({ userId, onNavigate }) {
   const [editForm, setEditForm]         = useState({});
   const [form, setForm] = useState({ name: "", limit_amount: "", closing_day: "", due_day: "", color: "#7c3aed" });
 
+  const [transactions, setTransactions] = useState([]);
+
   const load = async () => {
-    const [{ data: c }, { data: i }] = await Promise.all([
+    const [{ data: c }, { data: i }, { data: t }] = await Promise.all([
       supabase.from("cards").select("*").eq("user_id", userId).order("created_at"),
       supabase.from("installments")
         .select("*, purchases(description, category, total_amount, payment_method, has_interest, interest_rate, card_id)")
         .eq("user_id", userId).order("due_date"),
+      supabase.from("transactions").select("*").eq("user_id", userId).eq("type", "despesa").order("date", { ascending: false }).limit(1000),
     ]);
     setCards(c || []);
     setInstallments(i || []);
+    setTransactions(t || []);
   };
 
   useEffect(() => { load(); }, [userId]);
@@ -71,6 +76,7 @@ export default function Cartoes({ userId, onNavigate }) {
   const startEdit = (card) => { setEditId(card.id); setEditForm({ ...card }); };
 
   const saveEdit = async () => {
+    if (!editForm.name || !editForm.name.trim()) return;
     await supabase.from("cards").update({
       name: editForm.name,
       limit_amount: parseFloat(editForm.limit_amount || 0),
@@ -103,7 +109,16 @@ export default function Cartoes({ userId, onNavigate }) {
     [cardInstallments, filterMonth]
   );
 
-  const monthTotal    = monthInst.reduce((a, i) => a + Number(i.amount), 0);
+  // Avulsos lançados diretamente neste cartão no mês selecionado
+  const monthAvulsos = useMemo(() =>
+    selected
+      ? transactions.filter(t => t.card_id === selected.id && (t.date||"").startsWith(filterMonth))
+      : [],
+    [transactions, selected, filterMonth]
+  );
+
+  const monthTotal    = monthInst.reduce((a, i) => a + Number(i.amount), 0)
+                      + monthAvulsos.reduce((a, t) => a + Number(t.value), 0);
   const monthInterest = monthInst.reduce((a, i) => {
     if (i.purchases?.has_interest && i.purchases?.interest_rate > 0)
       return a + (Number(i.amount) * Number(i.purchases.interest_rate) / 100);
@@ -117,6 +132,37 @@ export default function Cartoes({ userId, onNavigate }) {
     : 0;
   const limitPct = selected && selected.limit_amount > 0
     ? Math.min((usedLimit / selected.limit_amount) * 100, 100) : 0;
+
+  // Evolução da fatura mês a mês, pro cartão selecionado
+  const evolutionData = useMemo(() => {
+    const map = {};
+    cardInstallments.forEach(i => {
+      const m = i.due_date.slice(0, 7);
+      map[m] = (map[m] || 0) + Number(i.amount);
+    });
+    // inclui avulsos lançados com este cartão
+    transactions
+      .filter(t => t.card_id === selected?.id)
+      .forEach(t => {
+        const m = (t.date||"").slice(0, 7);
+        if (m) map[m] = (map[m] || 0) + Number(t.value);
+      });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([m, total]) => ({ name: monthLabel(m), total }));
+  }, [cardInstallments, transactions, selected]);
+
+  // Comparativo: fatura do mês de referência, lado a lado entre todos os cartões
+  const cardsComparison = useMemo(() => {
+    return cards.map(card => ({
+      name: card.name,
+      color: card.color,
+      total: installments
+        .filter(i => i.purchases?.card_id === card.id && i.due_date.startsWith(filterMonth))
+        .reduce((a, i) => a + Number(i.amount), 0),
+    }));
+  }, [cards, installments, filterMonth]);
 
   // No mobile: quando seleciona um cartão, mostra só o detalhe (sem a lista ao lado)
   const showDetail = selected !== null;
@@ -267,6 +313,31 @@ export default function Cartoes({ userId, onNavigate }) {
                 );
               })}
             </div>
+
+            {/* Comparativo entre cartões — só faz sentido na visão geral */}
+            {!showDetail && cardsComparison.filter(c => c.total > 0).length > 1 && (
+              <Card style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Comparativo entre cartões</div>
+                  <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ ...inp, width: "auto", fontSize: 12 }}>
+                    {[...new Set(installments.map(i => i.due_date.slice(0,7)))].sort().concat(filterMonth).filter((v,i,a)=>a.indexOf(v)===i).map(m => (
+                      <option key={m} value={m}>{monthLabel(m)}</option>
+                    ))}
+                  </select>
+                </div>
+                <ResponsiveContainer width="100%" height={Math.max(120, cardsComparison.length * 36)}>
+                  <BarChart data={cardsComparison} layout="vertical" margin={{ left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(1)}k`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "var(--text)" }} axisLine={false} tickLine={false} width={90} />
+                    <Tooltip formatter={v => fmt(v)} contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Bar dataKey="total" radius={[0,4,4,0]}>
+                      {cardsComparison.map((c, i) => <Cell key={i} fill={c.color || "var(--accent)"} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
           </div>
         )}
 
@@ -308,6 +379,24 @@ export default function Cartoes({ userId, onNavigate }) {
                 ))}
               </div>
 
+              {/* Evolução da fatura */}
+              {evolutionData.length > 1 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
+                    Evolução da fatura
+                  </div>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <LineChart data={evolutionData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "var(--muted)" }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v/1000).toFixed(1)}k`} width={48} />
+                      <Tooltip formatter={v => fmt(v)} contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                      <Line type="monotone" dataKey="total" stroke={selected.color || "var(--accent)"} strokeWidth={2.5} dot={{ r: 3, fill: selected.color || "var(--accent)" }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
               {/* Uso do limite */}
               {selected.limit_amount > 0 && (
                 <div style={{ marginBottom: 16 }}>
@@ -322,35 +411,59 @@ export default function Cartoes({ userId, onNavigate }) {
               )}
 
               {/* Parcelas */}
-              {monthInst.length === 0
-                ? <div style={{ color: "var(--muted)", textAlign: "center", padding: "24px 0", fontSize: 13 }}>Nenhuma parcela neste mês</div>
-                : monthInst.map((inst, i) => (
-                  <div key={inst.id} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 0", borderBottom: i < monthInst.length - 1 ? "1px solid var(--border)" : "none",
-                    opacity: inst.paid ? .5 : 1,
-                  }}>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flex: 1, minWidth: 0 }}>
-                      <button onClick={() => togglePaid(inst.id, inst.paid)} style={{
-                        width: 20, height: 20, borderRadius: 6, border: "2px solid",
-                        borderColor: inst.paid ? "var(--green)" : "var(--border)",
-                        background: inst.paid ? "var(--green)" : "transparent",
-                        cursor: "pointer", color: "#fff", fontSize: 11, flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>{inst.paid ? "✓" : ""}</button>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textDecoration: inst.paid ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {inst.purchases?.description}
+              {monthInst.length === 0 && monthAvulsos.length === 0
+                ? <div style={{ color: "var(--muted)", textAlign: "center", padding: "24px 0", fontSize: 13 }}>Nenhuma despesa neste mês</div>
+                : <>
+                  {monthInst.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>Parcelas</div>
+                      {monthInst.map((inst, i) => (
+                        <div key={inst.id} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "10px 0", borderBottom: i < monthInst.length - 1 ? "1px solid var(--border)" : "none",
+                          opacity: inst.paid ? .5 : 1,
+                        }}>
+                          <div style={{ display: "flex", gap: 10, alignItems: "center", flex: 1, minWidth: 0 }}>
+                            <button onClick={() => togglePaid(inst.id, inst.paid)} style={{
+                              width: 20, height: 20, borderRadius: 6, border: "2px solid",
+                              borderColor: inst.paid ? "var(--green)" : "var(--border)",
+                              background: inst.paid ? "var(--green)" : "transparent",
+                              cursor: "pointer", color: "#fff", fontSize: 11, flexShrink: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>{inst.paid ? "✓" : ""}</button>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textDecoration: inst.paid ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {inst.purchases?.description}
+                              </div>
+                              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>
+                                Vence {inst.due_date}
+                                {inst.purchases?.has_interest && <span style={{ color: "var(--red)", marginLeft: 6 }}>c/ juros</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: inst.paid ? "var(--green)" : "var(--red)", flexShrink: 0, marginLeft: 8 }}>{fmt(inst.amount)}</div>
                         </div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>
-                          Vence {inst.due_date}
-                          {inst.purchases?.has_interest && <span style={{ color: "var(--red)", marginLeft: 6 }}>c/ juros</span>}
+                      ))}
+                    </>
+                  )}
+                  {monthAvulsos.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".06em", margin: "14px 0 8px" }}>Avulsos lançados no cartão</div>
+                      {monthAvulsos.map((t, i) => (
+                        <div key={t.id} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "10px 0", borderBottom: i < monthAvulsos.length - 1 ? "1px solid var(--border)" : "none",
+                        }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description}</div>
+                            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{t.cat} · {t.date}</div>
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--red)", flexShrink: 0, marginLeft: 8 }}>{fmt(t.value)}</div>
                         </div>
-                      </div>
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: inst.paid ? "var(--green)" : "var(--red)", flexShrink: 0, marginLeft: 8 }}>{fmt(inst.amount)}</div>
-                  </div>
-                ))
+                      ))}
+                    </>
+                  )}
+                </>
               }
             </Card>
           </div>
