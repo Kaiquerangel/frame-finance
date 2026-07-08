@@ -14,11 +14,12 @@ import Emprestimos   from "./pages/Emprestimos";
 import Orcamento     from "./pages/Orcamento";
 import Metas         from "./pages/Metas";
 import Categorias    from "./pages/Categorias";
-import Perfil        from "./components/Perfil";
+import Perfil        from "./pages/Perfil";
 import Historico     from "./pages/Historico";
 import Analise       from "./pages/Analise";
 import Aprendendo    from "./pages/Aprendendo";
 import Visao         from "./pages/Visao";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Welcome       from "./components/Welcome";
 import Footer, { FooterMini } from "./components/Footer";
 import Privacidade   from "./components/Privacidade";
@@ -104,7 +105,7 @@ export default function App() {
 
   useEffect(() => {
     if (session?.user) {
-      loadProfile(session.user.id);
+      loadProfile();
       syncFixedExpensePayments(session.user.id);
       syncRecurringRevenues(session.user.id);
     }
@@ -115,8 +116,8 @@ export default function App() {
 
     // Tour só aparece automaticamente se nunca foi completado
     // Usa localStorage para persistir entre sessões
-    const tourDone = getTourDone();
-    const welcomed = getWelcomed();
+    const tourDone = localStorage.getItem("ff_tour_done") === "true";
+    const welcomed = localStorage.getItem("ff_welcomed") === "true";
 
     if (!welcomed) {
       setShowWelcome(true);
@@ -145,10 +146,8 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showMore]);
 
-  const loadProfile = async (uid) => {
-    const id = uid ?? session?.user?.id;
-    if (!id) return;
-    const { data } = await supabase.from("profiles").select("*").eq("id", id).single();
+  const loadProfile = async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
     setProfile(data);
   };
 
@@ -186,7 +185,7 @@ export default function App() {
     dashboard: Dashboard, receitas: Receitas,
     gastos: Gastos, cartoes: Cartoes,
     emprestimos: Emprestimos, orcamento: Orcamento,
-    analise: Analise,
+    analise: Analise, relatorios: Analise,
     metas: Metas, categorias: Categorias, historico: Historico,
     aprendendo: Aprendendo, visao: Visao,
   };
@@ -284,11 +283,13 @@ export default function App() {
 
         {/* Conteúdo */}
         <main style={{ flex: 1, padding: "72px 16px 88px", overflowY: "auto" }}>
-          <PageComponent
-            userId={session.user.id}
-            onNavigate={navigate}
-            onStartTour={handleStartTourManual}
-          />
+          <ErrorBoundary resetKey={page} onNavigate={navigate}>
+            <PageComponent
+              userId={session.user.id}
+              onNavigate={navigate}
+              onStartTour={handleStartTourManual}
+            />
+          </ErrorBoundary>
         </main>
 
         {/* Menu Mais */}
@@ -415,7 +416,7 @@ export default function App() {
         </nav>
 
         {showPerfil && (
-          <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={() => loadProfile(session.user.id)} />
+          <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
         )}
         {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
 
@@ -560,11 +561,13 @@ export default function App() {
         padding: "32px 36px 0",
       }}>
         <div style={{ maxWidth: 980, width: "100%", flex: 1 }}>
-          <PageComponent
-            userId={session.user.id}
-            onNavigate={navigate}
-            onStartTour={handleStartTourManual}
-          />
+          <ErrorBoundary resetKey={page} onNavigate={navigate}>
+            <PageComponent
+              userId={session.user.id}
+              onNavigate={navigate}
+              onStartTour={handleStartTourManual}
+            />
+          </ErrorBoundary>
         </div>
         <div style={{ maxWidth: 980, width: "100%" }}>
           <Footer onPrivacidade={() => setShowPrivacidade(true)} />
@@ -572,7 +575,7 @@ export default function App() {
       </main>
 
       {showPerfil && (
-        <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={() => loadProfile(session.user.id)} />
+        <Perfil userId={session.user.id} profile={profile} onClose={() => setShowPerfil(false)} onUpdate={loadProfile} />
       )}
       {showPrivacidade && <Privacidade onClose={() => setShowPrivacidade(false)} />}
 

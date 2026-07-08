@@ -8,6 +8,7 @@ import { LoadingSpinner, ErrorMessage } from "../components/LoadingSpinner";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, Legend, ReferenceLine,
+  PieChart, Pie, Sector,
 } from "recharts";
 
 // ── Utilitários ───────────────────────────────────────────────────────────────
@@ -111,6 +112,98 @@ const MiniTreemap = ({ data, total, onClick }) => {
         );
       })}
     </div>
+  );
+};
+
+// ── Fatia ativa em destaque (hover) — padrão recharts para pie interativo ──
+const renderActiveSlice = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+  return (
+    <g>
+      <text x={cx} y={cy-8} textAnchor="middle" style={{ fontSize:13, fontWeight:800, fill:"var(--text)" }}>{payload.name}</text>
+      <text x={cx} y={cy+12} textAnchor="middle" style={{ fontSize:15, fontWeight:800, fill }}>{fmt(value)}</text>
+      <text x={cx} y={cy+30} textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)" }}>{(percent*100).toFixed(0)}%</text>
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius+7} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+      <Sector cx={cx} cy={cy} innerRadius={outerRadius+9} outerRadius={outerRadius+12} startAngle={startAngle} endAngle={endAngle} fill={fill} opacity={0.35} />
+    </g>
+  );
+};
+
+// ── Donut interativo — hover destaca fatia e mostra valor no centro ────────
+const InteractiveDonut = ({ data, centerLabel, centerValue, height=220, onSliceClick }) => {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const total = data.reduce((a,d)=>a+d.value,0);
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <PieChart>
+        <Pie
+          data={data} dataKey="value" nameKey="name"
+          cx="50%" cy="50%" innerRadius="62%" outerRadius="88%"
+          paddingAngle={3} cornerRadius={6}
+          activeIndex={activeIdx}
+          activeShape={renderActiveSlice}
+          onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+          onMouseLeave={()=>setActiveIdx(null)}
+          onClick={(d)=>onSliceClick&&onSliceClick(d.name)}
+          style={{ cursor:onSliceClick?"pointer":"default", outline:"none" }}
+          animationDuration={600}
+        >
+          {data.map((d,i)=><Cell key={i} fill={d.color} stroke="var(--surface)" strokeWidth={2} />)}
+        </Pie>
+        {activeIdx===null && (
+          <text x="50%" y="47%" textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)", fontWeight:600 }}>{centerLabel}</text>
+        )}
+        {activeIdx===null && (
+          <text x="50%" y="58%" textAnchor="middle" style={{ fontSize:17, fill:"var(--text)", fontWeight:800 }}>{centerValue}</text>
+        )}
+        <Legend verticalAlign="bottom" iconType="circle" iconSize={9}
+          wrapperStyle={{ fontSize:12, paddingTop:10 }}
+          formatter={(value,entry)=>{
+            const d=data.find(x=>x.name===value);
+            const pct=total>0?((d.value/total)*100).toFixed(0):0;
+            return <span style={{ color:"var(--text)" }}>{value} <span style={{ color:"var(--muted)" }}>({pct}%)</span></span>;
+          }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};
+
+// ── Pie de categorias — N fatias, clique abre drill-down ───────────────────
+const CategoryPie = ({ data, height=260, onSliceClick, maxSlices=7 }) => {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const sorted = [...data].sort((a,b)=>b.val-a.val);
+  const top = sorted.slice(0,maxSlices);
+  const rest = sorted.slice(maxSlices);
+  const restSum = rest.reduce((a,d)=>a+d.val,0);
+  const chartData = restSum>0 ? [...top, { cat:"Outras", val:restSum }] : top;
+  const pieData = chartData.map((d,i)=>({ name:d.cat, value:d.val, color:PALETTE[i%PALETTE.length] }));
+  const total = pieData.reduce((a,d)=>a+d.value,0);
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <PieChart>
+        <Pie
+          data={pieData} dataKey="value" nameKey="name"
+          cx="50%" cy="50%" innerRadius="45%" outerRadius="85%"
+          paddingAngle={2} cornerRadius={5}
+          activeIndex={activeIdx}
+          activeShape={renderActiveSlice}
+          onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+          onMouseLeave={()=>setActiveIdx(null)}
+          onClick={(d)=>d.name!=="Outras"&&onSliceClick&&onSliceClick(d.name)}
+          style={{ cursor:"pointer", outline:"none" }}
+          animationDuration={600}
+        >
+          {pieData.map((d,i)=><Cell key={i} fill={d.color} stroke="var(--surface)" strokeWidth={2} />)}
+        </Pie>
+        {activeIdx===null && (
+          <text x="50%" y="47%" textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)", fontWeight:600 }}>Total</text>
+        )}
+        {activeIdx===null && (
+          <text x="50%" y="58%" textAnchor="middle" style={{ fontSize:16, fill:"var(--text)", fontWeight:800 }}>{fmt(total)}</text>
+        )}
+      </PieChart>
+    </ResponsiveContainer>
   );
 };
 
@@ -236,10 +329,13 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
     if (!isThisMonth) return null;
     const daysInMonth=new Date(y,m,0).getDate();
     const dayOfMonth=now.getDate();
-    const daysLeft=Math.max(daysInMonth-dayOfMonth,0);
+    // +1 inclui hoje como dia disponível — mesma convenção do "Ritmo de gastos"
+    // logo abaixo. Antes os dois cards mostravam números diferentes (27 vs 28
+    // dias) para a mesma pergunta "quantos dias faltam no mês".
+    const daysLeft=Math.max(daysInMonth-dayOfMonth+1,1);
     if (dayOfMonth<2) return null;
     const avgDailyAvulso=totals.depTx/dayOfMonth;
-    const projectedAvulso=totals.depTx+(avgDailyAvulso*daysLeft);
+    const projectedAvulso=totals.depTx+(avgDailyAvulso*(daysLeft-1));
     const projectedDep=projectedAvulso+totals.depFixed+totals.depInst+totals.depLoan;
     return { projectedDep, projectedBal:totals.rec-projectedDep, daysLeft };
   },[filterMonth,totals]);
@@ -287,6 +383,10 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
 
   // ── Evolução 12 meses ─────────────────────────────────────────────────────
   const evolution = useMemo(()=>{
+    // Filtra até o mês atual — sem isso, parcelas futuras de financiamentos
+    // longos (ex: 120x) fariam o gráfico "últimos 12 meses" pular para o
+    // futuro, já que due_date de parcela 120/120 pode ser 10 anos à frente.
+    const nowYm = today();
     const allMonths=new Set([
       ...transactions.map(t=>t.date.slice(0,7)),
       ...revenues.map(r=>r.date.slice(0,7)),
@@ -295,7 +395,7 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
       ...loanInst.map(i=>(i.due_date||"").slice(0,7)).filter(Boolean),
     ]);
     let bal=0;
-    return [...allMonths].sort().slice(-12).map(ym=>{
+    return [...allMonths].filter(ym=>ym<=nowYm).sort().slice(-12).map(ym=>{
       const rec=revenues.filter(r=>r.date.startsWith(ym)).reduce((a,r)=>a+Number(r.amount),0)
                +transactions.filter(t=>t.date.startsWith(ym)&&t.type==="receita").reduce((a,t)=>a+Number(t.value),0);
       const dep=transactions.filter(t=>t.date.startsWith(ym)&&t.type==="despesa").reduce((a,t)=>a+Number(t.value),0)
@@ -327,12 +427,82 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
   const varDep = prevTotals.dep>0 ? ((totals.dep-prevTotals.dep)/prevTotals.dep)*100 : null;
   const varRec = prevTotals.rec>0 ? ((totals.rec-prevTotals.rec)/prevTotals.rec)*100 : null;
 
+  // ── Insights automáticos ──────────────────────────────────────────────────
+  // Gerados a partir de dados já calculados acima — nenhuma query nova.
+  // Cada insight só aparece se a condição for estatisticamente relevante
+  // (evita alarmismo com diferenças pequenas ou bases de comparação fracas).
+  const insights = useMemo(()=>{
+    const list=[];
+
+    // 1. Categoria que mais cresceu vs média dos últimos meses
+    if (byCat.length>0 && evolution.length>=3) {
+      const catAvgHist = {};
+      evolution.slice(0,-1).forEach(()=>{}); // placeholder de leitura, cálculo abaixo usa transactions diretamente
+      const topCat = byCat[0];
+      const histMonths = evolution.slice(-4,-1).map(e=>e.ym);
+      if (histMonths.length>0 && topCat) {
+        const histVals = histMonths.map(ym=>
+          transactions.filter(t=>t.type==="despesa"&&t.cat===topCat.cat&&t.date.startsWith(ym)).reduce((a,t)=>a+Number(t.value),0)
+          + fixedPayments.filter(fp=>(fp.due_date||"").startsWith(ym)&&(fp.fixed_expenses?.category||"Fixas")===topCat.cat).reduce((a,fp)=>a+Number(fp.amount),0)
+        );
+        const avgHist = histVals.reduce((a,v)=>a+v,0)/histVals.length;
+        if (avgHist>0 && topCat.val > avgHist*1.3) {
+          const pct = ((topCat.val-avgHist)/avgHist)*100;
+          list.push({ icon:"📈", text:`Você gastou ${pct.toFixed(0)}% a mais em ${topCat.cat} este mês comparado à média dos últimos 3 meses.`, tone:"warning" });
+        }
+      }
+    }
+
+    // 2. Comparação de despesa total vs mês anterior (só se variação for grande)
+    if (varDep!==null && Math.abs(varDep)>=20) {
+      list.push({
+        icon: varDep>0?"⬆️":"⬇️",
+        text: varDep>0
+          ? `Suas despesas subiram ${varDep.toFixed(0)}% em relação ao mês anterior.`
+          : `Suas despesas caíram ${Math.abs(varDep).toFixed(0)}% em relação ao mês anterior — bom trabalho!`,
+        tone: varDep>0?"warning":"success",
+      });
+    }
+
+    // 3. Fixos consumindo proporção muito alta da renda
+    if (totals.rec>0) {
+      const fixosRate=(totals.depFixed+totals.depInst+totals.depLoan)/totals.rec*100;
+      if (fixosRate>60) {
+        list.push({ icon:"📌", text:`Seus compromissos fixos consomem ${fixosRate.toFixed(0)}% da sua renda este mês — acima dos 50% recomendados.`, tone:"warning" });
+      }
+    }
+
+    // 4. Melhor taxa de poupança em vários meses
+    if (evolution.length>=4) {
+      const rates = evolution.map(e=>e.rec>0?((e.rec-e.dep)/e.rec)*100:null).filter(v=>v!==null);
+      const currentRate = totals.rec>0?((totals.rec-totals.dep)/totals.rec)*100:null;
+      if (currentRate!==null && rates.length>=3) {
+        const isPersonalBest = currentRate >= Math.max(...rates.slice(0,-1));
+        if (isPersonalBest && currentRate>15) {
+          list.push({ icon:"🏆", text:`Esta é sua melhor taxa de poupança dos últimos ${rates.length} meses: ${currentRate.toFixed(0)}%.`, tone:"success" });
+        }
+      }
+    }
+
+    // 5. Categoria concentrando gasto de forma desproporcional
+    if (byCat.length>0 && totals.dep>0) {
+      const top=byCat[0];
+      const topPct=(top.val/totals.dep)*100;
+      if (topPct>40 && byCat.length>=3) {
+        list.push({ icon:"🎯", text:`${top.cat} sozinha representa ${topPct.toFixed(0)}% de tudo que você gastou este mês.`, tone:"info" });
+      }
+    }
+
+    return list.slice(0,4);
+  },[byCat, evolution, transactions, fixedPayments, varDep, totals]);
+
   // ── Vencimentos próximos (7 dias) ─────────────────────────────────────────
   const upcoming = useMemo(()=>{
     const now=new Date(); const limit=new Date(now); limit.setDate(limit.getDate()+7);
     const toDate=s=>new Date(s+"T00:00:00");
     const items=[
       ...fixedPayments.filter(fp=>!fp.paid&&toDate(fp.due_date)>=now&&toDate(fp.due_date)<=limit)
+
         .map(fp=>({id:`fp-${fp.id}`,desc:fp.fixed_expenses?.description||"Fixa",val:Number(fp.amount),due:fp.due_date,type:"Fixa"})),
       ...installments.filter(i=>!i.paid&&toDate(i.due_date)>=now&&toDate(i.due_date)<=limit)
         .map(i=>({id:`inst-${i.id}`,desc:i.purchases?.description||"Parcela",val:Number(i.amount),due:i.due_date,type:"Parcela"})),
@@ -449,6 +619,22 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
         </div>
       </div>
 
+      {/* ── INSIGHTS AUTOMÁTICOS ─────────────────────────────────────────── */}
+      {insights.length>0&&(
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          {insights.map((ins,i)=>(
+            <div key={i} style={{
+              display:"flex", alignItems:"center", gap:10, padding:"11px 15px", borderRadius:11,
+              background: ins.tone==="success"?"var(--greenbg)":ins.tone==="warning"?"#fffbeb":"var(--accentbg)",
+              border:`1px solid ${ins.tone==="success"?"var(--green)":ins.tone==="warning"?"#f59e0b":"var(--accent)"}33`,
+            }}>
+              <span style={{ fontSize:16, flexShrink:0 }}>{ins.icon}</span>
+              <span style={{ fontSize:13, color:"var(--text)", lineHeight:1.5 }}>{ins.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── KPIs LINHA 1: Saldo · Receitas · Despesas · Fixos · Avulsos ── */}
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(5,1fr)", gap:isMobile?8:10 }}>
         <KpiCard icon="💰" label="Saldo líquido"
@@ -470,9 +656,9 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
         <KpiCard icon="📌" label="Fixos do mês"
           value={fmt(totals.depFixed+totals.depInst+totals.depLoan)}
           sub={`${filtFixed.filter(f=>!f.paid).length+filtInst.filter(i=>!i.paid).length+filtLoan.filter(i=>!i.paid).length} pendentes`}
-          sub2={`${fmtPct((totals.depFixed+totals.depInst+totals.depLoan)/Math.max(totals.rec,1)*100)} da renda`}
+          sub2={totals.rec>0?`${fmtPct((totals.depFixed+totals.depInst+totals.depLoan)/totals.rec*100)} da renda`:"Sem receita no mês"}
           color="#f59e0b"
-          urgent={(totals.depFixed+totals.depInst+totals.depLoan)/Math.max(totals.rec,1)>0.5}
+          urgent={totals.rec>0&&(totals.depFixed+totals.depInst+totals.depLoan)/totals.rec>0.5}
           onClick={()=>onNavigate("gastos")} />
         <KpiCard icon="💸" label="Avulsos"
           value={fmt(totals.depTx)}
@@ -499,9 +685,9 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
           onClick={()=>onNavigate("orcamento")} />
         <KpiCard icon="%" label="Taxa de gasto"
           value={totals.rec>0?fmtPct(totals.dep/totals.rec*100):"—"}
-          sub={totals.dep<=totals.rec*0.7?"Dentro do ideal":totals.dep<=totals.rec*0.9?"Moderado":"Acima do ideal"}
-          color={totals.dep<=totals.rec*0.7?"var(--green)":totals.dep<=totals.rec*0.9?"#f59e0b":"var(--red)"}
-          urgent={totals.dep>totals.rec*0.9} />
+          sub={totals.rec<=0?"Sem receita no mês":totals.dep<=totals.rec*0.7?"Dentro do ideal":totals.dep<=totals.rec*0.9?"Moderado":"Acima do ideal"}
+          color={totals.rec<=0?"var(--muted)":totals.dep<=totals.rec*0.7?"var(--green)":totals.dep<=totals.rec*0.9?"#f59e0b":"var(--red)"}
+          urgent={totals.rec>0&&totals.dep>totals.rec*0.9} />
         <KpiCard icon="🏦" label="Taxa de poupança"
           value={fmtPct(savingsRate)}
           sub={savingsRate>=20?"Excelente":savingsRate>=10?"Razoável":"Melhorar"}
@@ -636,17 +822,20 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
       {/* ── COMPOSIÇÃO: Avulsos vs Fixos + Detalhe fixos ─────────────────── */}
       {totals.dep>0&&(
         <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:12 }}>
-          {/* Composição macro */}
+          {/* Composição macro — donut interativo */}
           <Card>
             <div style={{ fontWeight:700, fontSize:14, color:"var(--text)", marginBottom:4 }}>Composição das despesas</div>
-            <div style={{ fontSize:11, color:"var(--muted)", marginBottom:14 }}>Avulsos vs compromissos fixos</div>
-            {[
-              { label:"Avulsos",   val:totals.depTx,                                      color:PALETTE[0], desc:"Gastos do dia a dia" },
-              { label:"Fixos",     val:totals.depFixed+totals.depInst+totals.depLoan,      color:PALETTE[3], desc:"Fixas + Parcelas + Empréstimos" },
-            ].map(item=>(
-              <BarH key={item.label} label={item.label} value={item.val} total={totals.dep} color={item.color} sub={item.desc} />
-            ))}
-            <button onClick={()=>onNavigate("visao")} style={{ marginTop:8, fontSize:11, color:"var(--accent)", background:"none", border:"none", cursor:"pointer", fontWeight:600, padding:0 }}>
+            <div style={{ fontSize:11, color:"var(--muted)", marginBottom:6 }}>Avulsos vs compromissos fixos</div>
+            <InteractiveDonut
+              data={[
+                { name:"Avulsos", value:totals.depTx, color:PALETTE[0] },
+                { name:"Fixos",   value:totals.depFixed+totals.depInst+totals.depLoan, color:PALETTE[3] },
+              ]}
+              centerLabel="Total"
+              centerValue={fmt(totals.dep)}
+              height={230}
+            />
+            <button onClick={()=>onNavigate("visao")} style={{ marginTop:4, fontSize:11, color:"var(--accent)", background:"none", border:"none", cursor:"pointer", fontWeight:600, padding:0 }}>
               Ver detalhe completo →
             </button>
           </Card>
@@ -656,7 +845,7 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
             <div style={{ fontWeight:700, fontSize:14, color:"var(--text)", marginBottom:4 }}>Detalhe dos fixos</div>
             <div style={{ fontSize:11, color:"var(--muted)", marginBottom:14 }}>
               Total: {fmt(totals.depFixed+totals.depInst+totals.depLoan)} ·{" "}
-              {fmtPct((totals.depFixed+totals.depInst+totals.depLoan)/Math.max(totals.rec,1)*100)} da renda
+              {totals.rec>0?`${fmtPct((totals.depFixed+totals.depInst+totals.depLoan)/totals.rec*100)} da renda`:"sem receita no mês para comparar"}
             </div>
             {[
               { label:"Despesas fixas",     val:totals.depFixed, color:"#f59e0b",  icon:"📌" },
@@ -670,7 +859,7 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
         </div>
       )}
 
-      {/* ── TREEMAP + CATEGORIAS ─────────────────────────────────────────── */}
+      {/* ── GASTOS POR CATEGORIA — pie interativo + barras ────────────────── */}
       {byCat.length>0&&(
         <Card>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
@@ -679,20 +868,22 @@ export default function Dashboard({ userId, onNavigate, onStartTour }) {
               {showAllCats?`Mostrar menos ▲`:`Ver todas (${byCat.length}) ▼`}
             </button>
           </div>
-          <div style={{ fontSize:11, color:"var(--muted)", marginBottom:12 }}>
-            {fmt(totals.dep)} total · <span style={{ color:"var(--accent)" }}>Clique numa categoria para ver histórico de 12 meses</span>
+          <div style={{ fontSize:11, color:"var(--muted)", marginBottom:8 }}>
+            {fmt(totals.dep)} total · <span style={{ color:"var(--accent)" }}>Clique numa fatia ou categoria para ver histórico de 12 meses</span>
           </div>
 
-          {/* Treemap visual */}
-          <MiniTreemap data={byCat} total={totals.dep} onClick={setSelectedCat} />
+          <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1.1fr", gap:16, alignItems:"center" }}>
+            {/* Pie interativo */}
+            <CategoryPie data={byCat} onSliceClick={setSelectedCat} height={260} />
 
-          {/* Lista de barras */}
-          <div style={{ marginTop:14 }}>
-            {(showAllCats?byCat:byCat.slice(0,6)).map((item,idx)=>(
-              <BarH key={item.cat} label={item.cat} value={item.val} total={totals.dep}
-                color={PALETTE[idx%PALETTE.length]}
-                onClick={()=>setSelectedCat(item.cat)} />
-            ))}
+            {/* Lista de barras */}
+            <div>
+              {(showAllCats?byCat:byCat.slice(0,6)).map((item,idx)=>(
+                <BarH key={item.cat} label={item.cat} value={item.val} total={totals.dep}
+                  color={PALETTE[idx%PALETTE.length]}
+                  onClick={()=>setSelectedCat(item.cat)} />
+              ))}
+            </div>
           </div>
         </Card>
       )}

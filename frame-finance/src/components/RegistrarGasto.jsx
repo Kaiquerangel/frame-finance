@@ -134,6 +134,7 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
           value: parseFloat(form.value),
           cat: form.category,
           date: form.date,
+          payment_method: form.payment_method || null,
         });
 
       } else if (tipo === "parcelado" && form.payment_method !== "credito") {
@@ -142,6 +143,7 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
           description: form.description,
           value: parseFloat(form.value),
           cat: form.category, date: form.date,
+          payment_method: form.payment_method || null,
         });
 
       } else if (tipo === "parcelado") {
@@ -224,6 +226,9 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
   const handleTipoSelect = (t) => {
     setTipo(t);
     setStep("form");
+    // Reseta o form ao entrar num tipo novo — evita herdar payment_method
+    // de uma seleção anterior (ex: "credito" ficando preso ao vir de Parcelado)
+    setForm({ ...EMPTY, payment_method: t === "unico" ? "" : EMPTY.payment_method });
   };
 
   const handleBack = () => {
@@ -415,10 +420,29 @@ export default function RegistrarGasto({ userId, onClose, onSaved }) {
 
               {/* ── ÚNICO ──────────────────────────────────────── */}
               {tipo === "unico" && (
-                <div>
-                  <Label>Data</Label>
-                  <input type="date" value={form.date} onChange={e => f("date", e.target.value)} style={inp} />
-                </div>
+                <>
+                  <div>
+                    <Label>Data</Label>
+                    <input type="date" value={form.date} onChange={e => f("date", e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    <Label>Forma de pagamento <span style={{ fontWeight:400, textTransform:"none", letterSpacing:0 }}>(opcional)</span></Label>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {[...PAYMENT_METHODS, { id:"transferencia", label:"Transferência", icon:"🔁" }].map(pm => (
+                        <button key={pm.id} onClick={() => f("payment_method", form.payment_method === pm.id ? "" : pm.id)} style={{
+                          padding: "8px 14px", borderRadius: 9, border: "1.5px solid",
+                          borderColor: form.payment_method === pm.id ? "var(--accent)" : "var(--border)",
+                          background: form.payment_method === pm.id ? "var(--accentbg)" : "transparent",
+                          color: form.payment_method === pm.id ? "var(--accent)" : "var(--muted)",
+                          fontWeight: 600, fontSize: 13, cursor: "pointer",
+                          display: "flex", alignItems: "center", gap: 5,
+                        }}>
+                          {pm.icon} {pm.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               {tipo === "parcelado" && (

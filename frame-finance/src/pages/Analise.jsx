@@ -6,7 +6,7 @@ import { LoadingSpinner, ErrorMessage } from "../components/LoadingSpinner";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, ReferenceLine, Cell,
-  AreaChart, Area,
+  AreaChart, Area, PieChart, Pie, Sector,
 } from "recharts";
 
 // ── Utilitários ───────────────────────────────────────────────────────────────
@@ -77,6 +77,97 @@ const BarH = ({ label, value, total, color, sub, delta, onClick }) => {
         <div style={{ height:"100%", width:`${p}%`, background:color, borderRadius:99, transition:"width .5s" }} />
       </div>
     </div>
+  );
+};
+
+// ── Fatia ativa em destaque (hover) ─────────────────────────────────────────
+const renderActiveSlice = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+  return (
+    <g>
+      <text x={cx} y={cy-8} textAnchor="middle" style={{ fontSize:13, fontWeight:800, fill:"var(--text)" }}>{payload.name}</text>
+      <text x={cx} y={cy+12} textAnchor="middle" style={{ fontSize:15, fontWeight:800, fill }}>{fmt(value)}</text>
+      <text x={cx} y={cy+30} textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)" }}>{(percent*100).toFixed(0)}%</text>
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius+7} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+      <Sector cx={cx} cy={cy} innerRadius={outerRadius+9} outerRadius={outerRadius+12} startAngle={startAngle} endAngle={endAngle} fill={fill} opacity={0.35} />
+    </g>
+  );
+};
+
+// ── Donut interativo ─────────────────────────────────────────────────────────
+const InteractiveDonut = ({ data, centerLabel, centerValue, height=220 }) => {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const total = data.reduce((a,d)=>a+d.value,0);
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <PieChart>
+        <Pie
+          data={data} dataKey="value" nameKey="name"
+          cx="50%" cy="50%" innerRadius="62%" outerRadius="88%"
+          paddingAngle={3} cornerRadius={6}
+          activeIndex={activeIdx}
+          activeShape={renderActiveSlice}
+          onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+          onMouseLeave={()=>setActiveIdx(null)}
+          style={{ outline:"none" }}
+          animationDuration={600}
+        >
+          {data.map((d,i)=><Cell key={i} fill={d.color} stroke="var(--surface)" strokeWidth={2} />)}
+        </Pie>
+        {activeIdx===null && (
+          <text x="50%" y="47%" textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)", fontWeight:600 }}>{centerLabel}</text>
+        )}
+        {activeIdx===null && (
+          <text x="50%" y="58%" textAnchor="middle" style={{ fontSize:17, fill:"var(--text)", fontWeight:800 }}>{centerValue}</text>
+        )}
+        <Legend verticalAlign="bottom" iconType="circle" iconSize={9}
+          wrapperStyle={{ fontSize:12, paddingTop:10 }}
+          formatter={(value)=>{
+            const d=data.find(x=>x.name===value);
+            const pct=total>0?((d.value/total)*100).toFixed(0):0;
+            return <span style={{ color:"var(--text)" }}>{value} <span style={{ color:"var(--muted)" }}>({pct}%)</span></span>;
+          }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};
+
+// ── Pie de categorias — N fatias, clique filtra ─────────────────────────────
+const CategoryPie = ({ data, height=260, onSliceClick, maxSlices=7 }) => {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const sorted = [...data].sort((a,b)=>b.val-a.val);
+  const top = sorted.slice(0,maxSlices);
+  const rest = sorted.slice(maxSlices);
+  const restSum = rest.reduce((a,d)=>a+d.val,0);
+  const chartData = restSum>0 ? [...top, { cat:"Outras", val:restSum }] : top;
+  const pieData = chartData.map((d,i)=>({ name:d.cat, value:d.val, color:PALETTE[i%PALETTE.length] }));
+  const total = pieData.reduce((a,d)=>a+d.value,0);
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <PieChart>
+        <Pie
+          data={pieData} dataKey="value" nameKey="name"
+          cx="50%" cy="50%" innerRadius="45%" outerRadius="85%"
+          paddingAngle={2} cornerRadius={5}
+          activeIndex={activeIdx}
+          activeShape={renderActiveSlice}
+          onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+          onMouseLeave={()=>setActiveIdx(null)}
+          onClick={(d)=>d.name!=="Outras"&&onSliceClick&&onSliceClick(d.name)}
+          style={{ cursor:"pointer", outline:"none" }}
+          animationDuration={600}
+        >
+          {pieData.map((d,i)=><Cell key={i} fill={d.color} stroke="var(--surface)" strokeWidth={2} />)}
+        </Pie>
+        {activeIdx===null && (
+          <text x="50%" y="47%" textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)", fontWeight:600 }}>Total</text>
+        )}
+        {activeIdx===null && (
+          <text x="50%" y="58%" textAnchor="middle" style={{ fontSize:16, fill:"var(--text)", fontWeight:800 }}>{fmt(total)}</text>
+        )}
+      </PieChart>
+    </ResponsiveContainer>
   );
 };
 
@@ -454,13 +545,16 @@ export default function Analise({ userId, onNavigate }) {
             <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:14 }}>
               <Card>
                 <SectionTitle sub="Avulsos vs compromissos fixos">Composição das despesas</SectionTitle>
-                {[
-                  { label:"Avulsos",   val:totals.depTx,  color:PALETTE[0], desc:"Gastos do dia a dia" },
-                  { label:"Fixos",     val:totals.depFixed+totals.depInst+totals.depLoan, color:PALETTE[3], desc:"Fixas + Parcelas + Empréstimos" },
-                ].map((item,i)=>(
-                  <BarH key={i} label={item.label} value={item.val} total={totals.dep} color={item.color} sub={item.desc} />
-                ))}
-                <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid var(--border)" }}>
+                <InteractiveDonut
+                  data={[
+                    { name:"Avulsos", value:totals.depTx, color:PALETTE[0] },
+                    { name:"Fixos",   value:totals.depFixed+totals.depInst+totals.depLoan, color:PALETTE[3] },
+                  ]}
+                  centerLabel="Total"
+                  centerValue={fmt(totals.dep)}
+                  height={200}
+                />
+                <div style={{ marginTop:8, paddingTop:12, borderTop:"1px solid var(--border)" }}>
                   <div style={{ fontSize:11, fontWeight:700, color:"var(--muted)", textTransform:"uppercase", letterSpacing:".04em", marginBottom:8 }}>Detalhe dos fixos</div>
                   {[
                     { label:"Despesas fixas",     val:totals.depFixed, color:"#f59e0b" },
@@ -539,27 +633,34 @@ export default function Analise({ userId, onNavigate }) {
             <SectionTitle sub={`${byCat.length} categorias · Total: ${fmt(totals.dep)}`}>Gastos por categoria</SectionTitle>
             {byCat.length===0
               ? <div style={{ color:"var(--muted)", textAlign:"center", padding:"28px 0", fontSize:13 }}>Nenhuma despesa no período</div>
-              : byCat.map((item,idx)=>(
-                <div key={item.cat}>
-                  <BarH label={item.cat} value={item.val} total={totals.dep} color={PALETTE[idx%PALETTE.length]}
-                    pct={(item.val/Math.max(totals.dep,1))*100} />
-                  {/* Detalhe por origem dentro da categoria */}
-                  {(item.avulso>0||item.fixo>0||item.parcela>0||item.emprestimo>0)&&(
-                    <div style={{ marginLeft:16, marginBottom:8, display:"flex", gap:8, flexWrap:"wrap" }}>
-                      {[
-                        { label:"Avulso", val:item.avulso,     color:"var(--accent)" },
-                        { label:"Fixa",   val:item.fixo,       color:"#f59e0b" },
-                        { label:"Parcela",val:item.parcela,    color:"#3b82f6" },
-                        { label:"Empr.",  val:item.emprestimo, color:"#7c3aed" },
-                      ].filter(s=>s.val>0).map(s=>(
-                        <span key={s.label} style={{ fontSize:10, fontWeight:600, color:s.color, background:"var(--bg)", border:`1px solid ${s.color}33`, borderRadius:6, padding:"2px 7px" }}>
-                          {s.label}: {fmt(s.val)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+              : (
+                <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1.1fr", gap:16, alignItems:"start" }}>
+                  <CategoryPie data={byCat} onSliceClick={(cat)=>setFilterCat(filterCat===cat?"all":cat)} height={260} />
+                  <div>
+                    {byCat.map((item,idx)=>(
+                      <div key={item.cat}>
+                        <BarH label={item.cat} value={item.val} total={totals.dep} color={PALETTE[idx%PALETTE.length]}
+                          onClick={()=>setFilterCat(filterCat===item.cat?"all":item.cat)} />
+                        {/* Detalhe por origem dentro da categoria */}
+                        {(item.avulso>0||item.fixo>0||item.parcela>0||item.emprestimo>0)&&(
+                          <div style={{ marginLeft:16, marginBottom:8, display:"flex", gap:8, flexWrap:"wrap" }}>
+                            {[
+                              { label:"Avulso", val:item.avulso,     color:"var(--accent)" },
+                              { label:"Fixa",   val:item.fixo,       color:"#f59e0b" },
+                              { label:"Parcela",val:item.parcela,    color:"#3b82f6" },
+                              { label:"Empr.",  val:item.emprestimo, color:"#7c3aed" },
+                            ].filter(s=>s.val>0).map(s=>(
+                              <span key={s.label} style={{ fontSize:10, fontWeight:600, color:s.color, background:"var(--bg)", border:`1px solid ${s.color}33`, borderRadius:6, padding:"2px 7px" }}>
+                                {s.label}: {fmt(s.val)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))
+              )
             }
           </Card>
         </div>

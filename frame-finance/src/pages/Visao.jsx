@@ -6,7 +6,8 @@ import { LoadingSpinner, ErrorMessage } from "../components/LoadingSpinner";
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, ReferenceLine, Cell,
+  Legend, ReferenceLine, Cell, PieChart, Pie, Sector,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 
 // ── Utilitários ────────────────────────────────────────────────────────────────
@@ -66,6 +67,98 @@ const BarH = ({ label, value, total, color, sub, onClick }) => {
     </div>
   );
 };
+
+// ── Fatia ativa em destaque (hover) ─────────────────────────────────────────
+const renderActiveSlice = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+  return (
+    <g>
+      <text x={cx} y={cy-8} textAnchor="middle" style={{ fontSize:13, fontWeight:800, fill:"var(--text)" }}>{payload.name}</text>
+      <text x={cx} y={cy+12} textAnchor="middle" style={{ fontSize:15, fontWeight:800, fill }}>{fmt(value)}</text>
+      <text x={cx} y={cy+30} textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)" }}>{(percent*100).toFixed(0)}%</text>
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius+7} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+      <Sector cx={cx} cy={cy} innerRadius={outerRadius+9} outerRadius={outerRadius+12} startAngle={startAngle} endAngle={endAngle} fill={fill} opacity={0.35} />
+    </g>
+  );
+};
+
+// ── Donut interativo ─────────────────────────────────────────────────────────
+const InteractiveDonut = ({ data, centerLabel, centerValue, height=220 }) => {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const total = data.reduce((a,d)=>a+d.value,0);
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <PieChart>
+        <Pie
+          data={data} dataKey="value" nameKey="name"
+          cx="50%" cy="50%" innerRadius="62%" outerRadius="88%"
+          paddingAngle={3} cornerRadius={6}
+          activeIndex={activeIdx}
+          activeShape={renderActiveSlice}
+          onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+          onMouseLeave={()=>setActiveIdx(null)}
+          style={{ outline:"none" }}
+          animationDuration={600}
+        >
+          {data.map((d,i)=><Cell key={i} fill={d.color} stroke="var(--surface)" strokeWidth={2} />)}
+        </Pie>
+        {activeIdx===null && (
+          <text x="50%" y="47%" textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)", fontWeight:600 }}>{centerLabel}</text>
+        )}
+        {activeIdx===null && (
+          <text x="50%" y="58%" textAnchor="middle" style={{ fontSize:17, fill:"var(--text)", fontWeight:800 }}>{centerValue}</text>
+        )}
+        <Legend verticalAlign="bottom" iconType="circle" iconSize={9}
+          wrapperStyle={{ fontSize:12, paddingTop:10 }}
+          formatter={(value)=>{
+            const d=data.find(x=>x.name===value);
+            const pct=total>0?((d.value/total)*100).toFixed(0):0;
+            return <span style={{ color:"var(--text)" }}>{value} <span style={{ color:"var(--muted)" }}>({pct}%)</span></span>;
+          }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};
+
+// ── Pie de categorias — N fatias, clique filtra ─────────────────────────────
+const CategoryPie = ({ data, height=260, onSliceClick, maxSlices=7 }) => {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const sorted = [...data].sort((a,b)=>b.val-a.val);
+  const top = sorted.slice(0,maxSlices);
+  const rest = sorted.slice(maxSlices);
+  const restSum = rest.reduce((a,d)=>a+d.val,0);
+  const chartData = restSum>0 ? [...top, { cat:"Outras", val:restSum }] : top;
+  const pieData = chartData.map((d,i)=>({ name:d.cat, value:d.val, color:PALETTE[i%PALETTE.length] }));
+  const total = pieData.reduce((a,d)=>a+d.value,0);
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <PieChart>
+        <Pie
+          data={pieData} dataKey="value" nameKey="name"
+          cx="50%" cy="50%" innerRadius="45%" outerRadius="85%"
+          paddingAngle={2} cornerRadius={5}
+          activeIndex={activeIdx}
+          activeShape={renderActiveSlice}
+          onMouseEnter={(_,idx)=>setActiveIdx(idx)}
+          onMouseLeave={()=>setActiveIdx(null)}
+          onClick={(d)=>d.name!=="Outras"&&onSliceClick&&onSliceClick(d.name)}
+          style={{ cursor:"pointer", outline:"none" }}
+          animationDuration={600}
+        >
+          {pieData.map((d,i)=><Cell key={i} fill={d.color} stroke="var(--surface)" strokeWidth={2} />)}
+        </Pie>
+        {activeIdx===null && (
+          <text x="50%" y="47%" textAnchor="middle" style={{ fontSize:11, fill:"var(--muted)", fontWeight:600 }}>Total</text>
+        )}
+        {activeIdx===null && (
+          <text x="50%" y="58%" textAnchor="middle" style={{ fontSize:16, fill:"var(--text)", fontWeight:800 }}>{fmt(total)}</text>
+        )}
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};
+
 const ScoreRing = ({ pts, color, size=100 }) => {
   const r=(size-10)/2, circ=2*Math.PI*r, dash=(pts/100)*circ;
   return (
@@ -209,6 +302,9 @@ export default function Visao({ userId, onNavigate }) {
 
   // ── Evolução 12 meses ────────────────────────────────────────────────────────
   const evolution = useMemo(()=>{
+    // Filtra até o mês atual — evita que parcelas futuras de financiamentos
+    // longos (ex: 120x) façam o gráfico pular para datas anos à frente.
+    const nowYm = today();
     const allM=new Set([
       ...transactions.map(t=>t.date.slice(0,7)),
       ...revenues.map(r=>r.date.slice(0,7)),
@@ -217,7 +313,7 @@ export default function Visao({ userId, onNavigate }) {
       ...loanInst.map(li=>(li.due_date||"").slice(0,7)).filter(Boolean),
     ]);
     let balAcum=0;
-    return [...allM].sort().slice(-12).map(ym=>{
+    return [...allM].filter(ym=>ym<=nowYm).sort().slice(-12).map(ym=>{
       const rec=revenues.filter(r=>r.date.startsWith(ym)).reduce((a,r)=>a+Number(r.amount),0)
                +transactions.filter(t=>t.date.startsWith(ym)&&t.type==="receita").reduce((a,t)=>a+Number(t.value),0);
       const depTx=transactions.filter(t=>t.date.startsWith(ym)&&t.type==="despesa").reduce((a,t)=>a+Number(t.value),0);
@@ -326,7 +422,7 @@ export default function Visao({ userId, onNavigate }) {
               { l:"Receitas",      v:fmt(totals.rec) },
               { l:"Despesas",      v:fmt(totals.dep), color:totals.dep>totals.rec?"#fca5a5":"rgba(255,255,255,.9)" },
               { l:"% renda gasta", v:totals.rec>0?`${totals.txRate.toFixed(0)}%`:"—", color:totals.txRate>90?"#fca5a5":totals.txRate>70?"#fde68a":"rgba(255,255,255,.9)" },
-              { l:"Taxa poupança", v:`${totals.savingsRate.toFixed(0)}%`, color:totals.savingsRate>=20?"#86efac":totals.savingsRate>=10?"#fde68a":"#fca5a5" },
+              { l:"Taxa poupança", v:totals.rec>0?`${totals.savingsRate.toFixed(0)}%`:"—", color:totals.rec<=0?"rgba(255,255,255,.9)":totals.savingsRate>=20?"#86efac":totals.savingsRate>=10?"#fde68a":"#fca5a5" },
               { l:"Score",         v:score?`${score.pts}/100`:"—", color:score?.color.includes("green")?"#86efac":score?.color.includes("red")?"#fca5a5":"#fde68a" },
             ].map(({l,v,color})=>(
               <div key={l}>
@@ -355,28 +451,36 @@ export default function Visao({ userId, onNavigate }) {
       {/* ══════════ ABA: CUSTO MENSAL ══════════ */}
       {activeTab==="custo"&&(
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          {/* 2 cards macro */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-            <Card>
-              <div style={{ fontSize:22, marginBottom:6 }}>💸</div>
-              <div style={{ fontSize:12, color:"var(--muted)", fontWeight:600, marginBottom:2 }}>Avulsos</div>
-              <div style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic", marginBottom:8 }}>Gastos do dia a dia</div>
-              <div style={{ fontSize:isMobile?18:24, fontWeight:800, color:"var(--accent)" }}>{fmt(totals.depTx)}</div>
-              <div style={{ fontSize:11, color:"var(--muted)", marginTop:4 }}>
-                {totals.dep>0?`${((totals.depTx/totals.dep)*100).toFixed(0)}% das despesas`:"—"}
+          {/* Composição — donut interativo */}
+          <Card>
+            <SectionTitle sub="Avulsos vs compromissos fixos, com destaque ao passar o mouse">Composição do mês</SectionTitle>
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:16, alignItems:"center" }}>
+              <InteractiveDonut
+                data={[
+                  { name:"Avulsos", value:totals.depTx, color:"var(--accent)" },
+                  { name:"Fixos",   value:totals.fixos, color:"#f59e0b" },
+                ]}
+                centerLabel="Total"
+                centerValue={fmt(totals.dep)}
+                height={220}
+              />
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                <div>
+                  <div style={{ fontSize:12, color:"var(--muted)", fontWeight:600 }}>💸 Avulsos — gastos do dia a dia</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:"var(--accent)", marginTop:2 }}>{fmt(totals.depTx)}</div>
+                  <div style={{ fontSize:11, color:"var(--muted)" }}>{totals.dep>0?`${((totals.depTx/totals.dep)*100).toFixed(0)}% das despesas`:"—"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:12, color:"var(--muted)", fontWeight:600 }}>📌 Fixos — fixas + parcelas + empréstimos</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:"#f59e0b", marginTop:2 }}>{fmt(totals.fixos)}</div>
+                  <div style={{ fontSize:11, color:totals.fixosRate>50?"var(--red)":"var(--muted)" }}>
+                    {totals.rec>0?`${totals.fixosRate.toFixed(0)}% da renda`:totals.dep>0?`${((totals.fixos/totals.dep)*100).toFixed(0)}% das despesas`:"—"}
+                    {totals.fixosRate>50&&" ⚠ Acima do recomendado"}
+                  </div>
+                </div>
               </div>
-            </Card>
-            <Card>
-              <div style={{ fontSize:22, marginBottom:6 }}>📌</div>
-              <div style={{ fontSize:12, color:"var(--muted)", fontWeight:600, marginBottom:2 }}>Fixos</div>
-              <div style={{ fontSize:11, color:"var(--muted)", fontStyle:"italic", marginBottom:8 }}>Fixas + Parcelas + Empréstimos</div>
-              <div style={{ fontSize:isMobile?18:24, fontWeight:800, color:"#f59e0b" }}>{fmt(totals.fixos)}</div>
-              <div style={{ fontSize:11, color:totals.fixosRate>50?"var(--red)":"var(--muted)", marginTop:4 }}>
-                {totals.rec>0?`${totals.fixosRate.toFixed(0)}% da renda`:totals.dep>0?`${((totals.fixos/totals.dep)*100).toFixed(0)}% das despesas`:"—"}
-                {totals.fixosRate>50&&" ⚠ Acima do recomendado (50%)"}
-              </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
 
           {/* Detalhe dos fixos */}
           {totals.fixos>0&&(
@@ -391,7 +495,9 @@ export default function Visao({ userId, onNavigate }) {
               ))}
               <div style={{ marginTop:12, padding:"10px 14px", borderRadius:9, background:"var(--bg)", border:"1px solid var(--border)", fontSize:12, color:"var(--muted)", lineHeight:1.6 }}>
                 💡 Regra saudável: fixos abaixo de 50% da renda. Você está em {totals.rec>0?`${totals.fixosRate.toFixed(0)}%`:"—"}.
-                {totals.fixosRate>50?" Considere revisar as despesas fixas.":" Boa margem de manobra!"}
+                {totals.rec<=0
+                  ? " Sem receita lançada neste mês para avaliar essa proporção."
+                  : totals.fixosRate>50?" Considere revisar as despesas fixas.":" Boa margem de manobra!"}
               </div>
             </Card>
           )}
@@ -427,9 +533,14 @@ export default function Visao({ userId, onNavigate }) {
           {byCat.length>0&&(
             <Card>
               <SectionTitle sub="Todos os gastos agrupados por categoria — avulsos + fixos juntos">Por categoria</SectionTitle>
-              {byCat.map((item,idx)=>(
-                <BarH key={item.cat} label={item.cat} value={item.val} total={totals.dep} color={PALETTE[idx%PALETTE.length]} />
-              ))}
+              <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1.1fr", gap:16, alignItems:"center" }}>
+                <CategoryPie data={byCat} height={260} />
+                <div>
+                  {byCat.map((item,idx)=>(
+                    <BarH key={item.cat} label={item.cat} value={item.val} total={totals.dep} color={PALETTE[idx%PALETTE.length]} />
+                  ))}
+                </div>
+              </div>
             </Card>
           )}
         </div>
@@ -618,8 +729,17 @@ export default function Visao({ userId, onNavigate }) {
                     </div>
                   </div>
 
-                  {/* Os 4 fatores */}
-                  <SectionTitle>Fatores do score</SectionTitle>
+                  {/* Os 4 fatores — radar + barras de detalhe */}
+                  <SectionTitle sub="Visão geral dos 4 pilares que compõem o score">Fatores do score</SectionTitle>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <RadarChart data={Object.values(score.factors).map(f=>({ label:f.label, pct:Math.round((f.pts/f.max)*100) }))}>
+                      <PolarGrid stroke="var(--border)" />
+                      <PolarAngleAxis dataKey="label" tick={{ fontSize:11, fill:"var(--muted)" }} />
+                      <PolarRadiusAxis domain={[0,100]} tick={false} axisLine={false} />
+                      <Radar dataKey="pct" stroke={score.color} fill={score.color} fillOpacity={0.35} strokeWidth={2} />
+                      <Tooltip formatter={v=>`${v}%`} contentStyle={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, fontSize:12 }} />
+                    </RadarChart>
+                  </ResponsiveContainer>
                   {Object.values(score.factors).map(f=>(
                     <div key={f.label} style={{ background:"var(--bg)", borderRadius:10, padding:"12px 14px", marginBottom:10, border:"1px solid var(--border)" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>

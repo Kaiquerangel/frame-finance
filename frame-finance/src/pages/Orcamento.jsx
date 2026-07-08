@@ -303,7 +303,14 @@ export default function Orcamento({ userId, onNavigate }) {
   const [loanInst, setLoanInst]           = useState([]);
   const [categories, setCategories]     = useState([]);
   const [month, setMonth]               = useState(today());
-  const [loading, setLoading]           = useState(false);
+  const [loading, setLoading]           = useState(true);
+  // Começa true (não false) de propósito: essa tela SEMPRE busca dados do
+  // banco assim que monta. Se começasse false, o useEffect que decide abrir
+  // o assistente rodava ANTES da busca terminar, via com "budgets = []"
+  // (ainda vazio por não ter chegado resposta) e concluía erroneamente que
+  // não havia orçamento — abrindo o assistente por engano mesmo quando o
+  // usuário já tinha 24 categorias configuradas no banco. Esse foi o bug
+  // relatado: "orçamento já montado, mas continua pedindo pra montar".
   const [form, setForm]                 = useState({ category: "", amount: "" });
   const [showWizard, setShowWizard]     = useState(false);
   const [wizardDismissed, setWizardDismissed] = useState(false);
@@ -311,6 +318,7 @@ export default function Orcamento({ userId, onNavigate }) {
   const [showTips, setShowTips]         = useState(null); // id da categoria com dica aberta
 
   const load = async () => {
+    setLoading(true);
     const [{ data: b }, { data: t }, { data: fp }, { data: inst }, { data: li }, cats] = await Promise.all([
       supabase.from("budgets").select("*").eq("user_id", userId).eq("month", month),
       supabase.from("transactions").select("*").eq("user_id", userId).like("date", `${month}%`),
@@ -319,19 +327,48 @@ export default function Orcamento({ userId, onNavigate }) {
       supabase.from("loan_installments").select("*, loans(category)").eq("user_id", userId).like("due_date", `${month}%`),
       loadCategories(userId),
     ]);
-    setBudgets(b || []);
+
+    let currentBudgets = b || [];
+
+    // Se não há orçamento no mês selecionado, tenta herdar do mês mais
+    // recente que já teve orçamento configurado — orçamento normalmente não
+    // muda todo mês, então não faz sentido pedir de novo ao usuário toda
+    // vez que o calendário vira. Só mostra o assistente se nunca existiu
+    // nenhum orçamento em nenhum mês.
+    if (currentBudgets.length === 0) {
+      const { data: anyBudget } = await supabase
+        .from("budgets")
+        .select("*")
+        .eq("user_id", userId)
+        .lt("month", month)
+        .order("month", { ascending: false })
+        .limit(50); // até 50 categorias do mês mais recente encontrado
+
+      if (anyBudget && anyBudget.length > 0) {
+        const lastMonth = anyBudget[0].month;
+        const toCopy = anyBudget.filter(bud => bud.month === lastMonth);
+        const copied = toCopy.map(bud => ({
+          user_id: userId, category: bud.category, amount: bud.amount, month,
+        }));
+        await supabase.from("budgets").upsert(copied, { onConflict: "user_id,category,month" });
+        currentBudgets = copied;
+      }
+    }
+
+    setBudgets(currentBudgets);
     setTransactions(t || []);
     setFixedPayments(fp || []);
     setInstallments(inst || []);
     setLoanInst(li || []);
     setCategories(cats.despesa || []);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, [userId, month]);
 
-  // Abre wizard automaticamente só na primeira vez que confirma que não há orçamento
-  // Não reabre se o usuário dispensou manualmente (wizardDismissed)
-  // Não reabre ao trocar de mês — cada mês pode ter orçamento diferente
+  // Abre wizard automaticamente só quando realmente nunca existiu orçamento
+  // em nenhum mês (nem no atual, nem herdado de um mês anterior).
+  // Não reabre se o usuário dispensou manualmente (wizardDismissed).
   useEffect(() => {
     if (!loading && budgets.length === 0 && !wizardDismissed) setShowWizard(true);
   }, [budgets, loading]);
